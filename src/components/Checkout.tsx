@@ -15,7 +15,7 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
   const set = (k: keyof Form) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
 
   const locate = () => {
-    if (!navigator.geolocation) return toast.error("Seu aparelho não suporta localização.");
+    if (!navigator.geolocation) { toast.error("Seu aparelho não suporta localização."); return; }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(async ({ coords }) => {
       try {
@@ -39,7 +39,7 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
     if (!f.cidade.trim()) e.cidade = "Obrigatório";
     if (!f.pagamento) e.pagamento = "Escolha a forma de pagamento";
     setErrors(e);
-    if (Object.keys(e).length) return toast.error("Preencha os campos obrigatórios.");
+    if (Object.keys(e).length) { toast.error("Preencha os campos obrigatórios."); return; }
 
     const endereco = `${f.rua.trim()}, ${f.numero.trim()} - ${f.bairro.trim()}, ${f.cidade.trim()}${f.complemento.trim() ? ` (${f.complemento.trim()})` : ""}`;
     const pagamento = f.pagamento === "Dinheiro" && f.troco.trim() ? `Dinheiro (troco para ${f.troco.trim()})` : f.pagamento;
