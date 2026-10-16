@@ -31,7 +31,7 @@ function findImage(name: string): Promise<string> {
       let src = "";
       try {
         const q = cleanName(name);
-        src = (await wiki("pt", q)) || (await wiki("pt", q.split(" ")[0])) || "";
+        src = (await wiki("pt", q)) || (await wiki("pt", q.split(" ")[0] ?? q)) || "";
       } catch { /* ignora */ }
       mem[name] = src;
       try { localStorage.setItem(CACHE_KEY, JSON.stringify(mem)); } catch { /* ignora */ }
