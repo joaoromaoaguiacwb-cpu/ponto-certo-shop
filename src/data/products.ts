@@ -1,8 +1,8 @@
 // ⚙️ Número do WhatsApp da loja (somente dígitos, com DDI + DDD)
-export const STORE_WHATSAPP = "5527999999999";
+export const STORE_WHATSAPP = "5542984138233";
 
 export type Category = { id: string; name: string; emoji: string };
-export type Product = { id: number; name: string; price: number; category: string; image: string };
+export type Product = { id: number; name: string; price: number; category: string; image: string; fallback: string };
 
 export const CATEGORIES: Category[] = [
   { id: "frutas", name: "Frutas", emoji: "🍎" },
@@ -18,6 +18,22 @@ export const CATEGORIES: Category[] = [
   { id: "snacks", name: "Snacks e Doces", emoji: "🍫" },
   { id: "utilidades", name: "Utilidades Domésticas", emoji: "🍳" },
 ];
+
+// Palavra extra por categoria: junto com a palavra do produto, força a foto a ter as DUAS tags
+const CONTEXT: Record<string, string> = {
+  frutas: "fruit",
+  verduras: "vegetable",
+  carnes: "meat",
+  frios: "dairy",
+  padaria: "bakery",
+  mercearia: "food",
+  bebidas: "drink",
+  limpeza: "cleaning",
+  higiene: "hygiene",
+  congelados: "food",
+  snacks: "snack",
+  utilidades: "kitchen",
+};
 
 // [nome, preço, palavra-chave da foto (inglês)]
 const RAW: Record<string, [string, number, string][]> = {
@@ -120,11 +136,21 @@ const RAW: Record<string, [string, number, string][]> = {
   ],
 };
 
+// Monta o link da foto: palavra do produto + palavra da categoria, e "/all" exige as DUAS tags.
+// Ex.: banana + fruit -> https://loremflickr.com/320/320/banana,fruit/all?lock=1
+const imageUrl = (kw: string, category: string, id: number) => {
+  const tags = [...kw.split("-"), CONTEXT[category]].filter(Boolean).join(",");
+  return `https://loremflickr.com/320/320/${tags}/all?lock=${id}`;
+};
+
+// Plano B: busca mais aberta (qualquer uma das tags), usada se a foto principal não carregar
+const fallbackUrl = (kw: string, id: number) => `https://loremflickr.com/320/320/${kw.split("-").join(",")}?lock=${id}`;
+
 let id = 0;
 export const PRODUCTS: Product[] = Object.entries(RAW).flatMap(([category, items]) =>
   items.map(([name, price, kw]) => {
     id++;
-    return { id, name, price, category, image: `https://loremflickr.com/320/320/${kw}?lock=${id}` };
+    return { id, name, price, category, image: imageUrl(kw, category, id), fallback: fallbackUrl(kw, id) };
   }),
 );
 
