@@ -67,7 +67,7 @@ function Index() {
       </div>
 
       <button aria-label="Abrir carrinho" onClick={() => setView("cart")}
-        className="fixed bottom-5 right-5 z-40 grid h-16 w-16 place-items-center rounded-full bg-primary text-primary-foreground shadow-float transition active:scale-95">
+        className="fixed bottom-5 left-5 z-40 grid h-16 w-16 place-items-center rounded-full bg-primary text-primary-foreground shadow-float transition active:scale-95">
         <ShoppingCart size={28} />
         {cart.count > 0 && (
           <span className="absolute -right-1 -top-1 grid h-7 min-w-7 place-items-center rounded-full bg-accent px-1.5 text-xs font-extrabold text-accent-foreground ring-2 ring-card">

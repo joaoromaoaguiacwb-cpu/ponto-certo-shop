@@ -35,6 +35,23 @@ OUT_DIR = "public/produtos"
 UA = {"User-Agent": "mercado-imagens/1.0"}
 
 pexels_bloqueado = False
+PALAVRAS = []  # palavras do produto atual (sem o contexto), para checar a relevância
+
+
+def relevante(texto):
+    t = (texto or "").lower()
+    return any(p in t for p in PALAVRAS)
+
+# Palavra extra por categoria (evita "kiwi" virar o passarinho em vez da fruta)
+CONTEXT = {
+    "frutas": "fruit", "verduras": "vegetable", "carnes": "meat", "frios": "dairy food",
+    "padaria": "bakery", "mercearia": "food", "bebidas": "drink", "limpeza": "cleaning product",
+    "higiene": "hygiene product", "congelados": "frozen food", "snacks": "snack",
+    "utilidades": "household",
+}
+# Categorias de comida: no Pixabay, filtra só fotos da categoria "food"
+PIXABAY_FOOD = {"frutas", "verduras", "carnes", "frios", "padaria", "mercearia",
+                "bebidas", "congelados", "snacks"}
 
 
 def get(url, headers=None):
@@ -52,7 +69,7 @@ def pexels(query):
     if not PEXELS_KEY or pexels_bloqueado:
         return ""
     url = "https://api.pexels.com/v1/search?" + urllib.parse.urlencode(
-        {"query": query, "per_page": 1, "orientation": "square"}
+        {"query": query, "per_page": 5, "orientation": "square"}
     )
     try:
         j = get_json(url, {"Authorization": PEXELS_KEY})
@@ -63,18 +80,29 @@ def pexels(query):
             return ""
         raise
     photos = j.get("photos") or []
-    return photos[0]["src"]["medium"] if photos else ""
+    if not photos:
+        return ""
+    for ph in photos:
+        if relevante(ph.get("alt")):
+            return ph["src"]["medium"]
+    return photos[0]["src"]["medium"]
 
 
-def pixabay(query):
+def pixabay(query, categoria=""):
     if not PIXABAY_KEY:
         return ""
-    url = "https://pixabay.com/api/?" + urllib.parse.urlencode(
-        {"key": PIXABAY_KEY, "q": query, "image_type": "photo",
-         "per_page": 3, "safesearch": "true", "order": "popular"}
-    )
+    params = {"key": PIXABAY_KEY, "q": query, "image_type": "photo",
+              "per_page": 10, "safesearch": "true", "order": "popular"}
+    if categoria in PIXABAY_FOOD:
+        params["category"] = "food"
+    url = "https://pixabay.com/api/?" + urllib.parse.urlencode(params)
     hits = get_json(url).get("hits") or []
-    return hits[0]["webformatURL"] if hits else ""
+    if not hits:
+        return ""
+    for h in hits:
+        if relevante(h.get("tags")):
+            return h["webformatURL"]
+    return hits[0]["webformatURL"]
 
 
 def commons(query):
@@ -92,22 +120,35 @@ def commons(query):
 
 
 text = open(SRC, encoding="utf-8").read()
-items = re.findall(r'\["([^"]+)",\s*([\d.]+),\s*"([^"]+)"\]', text)
+items = []
+_cat = ""
+for linha in text.splitlines():
+    m = re.match(r"^  (\w+): \[\s*$", linha)
+    if m:
+        _cat = m.group(1)
+        continue
+    for nome, preco, kw in re.findall(r'\["([^"]+)",\s*([\d.]+),\s*"([^"]+)"\]', linha):
+        items.append((nome, preco, kw, _cat))
 print(f"{len(items)} produtos encontrados")
 os.makedirs(OUT_DIR, exist_ok=True)
 
 cache = json.load(open(OUT_JSON, encoding="utf-8")) if os.path.exists(OUT_JSON) else {}
+if cache.get("__versao") != "3":  # busca nova (com categoria): refaz todas as fotos
+    cache = {"__versao": "3"}
 
-for i, (name, _price, kw) in enumerate(items, 1):
+for i, (name, _price, kw, cat) in enumerate(items, 1):
     arquivo = f"{i:03d}.jpg"
     caminho = os.path.join(OUT_DIR, arquivo)
     if cache.get(name) and os.path.exists(caminho):
         continue
-    query = kw.replace("-", " ")
+    palavras = kw.replace("-", " ")
+    PALAVRAS[:] = [p for p in palavras.split() if len(p) > 2]
+    ctx = CONTEXT.get(cat, "")
+    query = palavras if ctx.split()[0] in palavras.split() else f"{palavras} {ctx}".strip()
     ok = False
     for fonte in (pexels, pixabay, commons):
         try:
-            url = fonte(query)
+            url = fonte(query, cat) if fonte is pixabay else fonte(query)
             if not url:
                 continue
             data = get(url)
@@ -115,7 +156,7 @@ for i, (name, _price, kw) in enumerate(items, 1):
                 continue
             open(caminho, "wb").write(data)
             cache[name] = f"/produtos/{arquivo}"
-            print(f"[{i}/{len(items)}] {name} ({fonte.__name__}) OK")
+            print(f"[{i}/{len(items)}] {name} -> \"{query}\" ({fonte.__name__}) OK")
             ok = True
             break
         except Exception as e:
@@ -125,7 +166,7 @@ for i, (name, _price, kw) in enumerate(items, 1):
     json.dump(cache, open(OUT_JSON, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     time.sleep(0.4)
 
-faltando = [n for n, _, _ in items if not cache.get(n)]
+faltando = [n for n, _, _, _ in items if not cache.get(n)]
 print(f"\nPronto. {len(items) - len(faltando)} com imagem, {len(faltando)} sem.")
 if faltando:
     print("Sem imagem (rode de novo mais tarde ou me avise):")
