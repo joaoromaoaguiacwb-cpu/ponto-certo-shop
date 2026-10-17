@@ -1,0 +1,1 @@
+Pasta das fotos dos produtos (gerada pelo script buscar_imagens.py)

@@ -1,3 +1,5 @@
+import IMAGES from "./images.json";
+
 // ⚙️ Número do WhatsApp da loja (somente dígitos, com DDI + DDD)
 export const STORE_WHATSAPP = "5542984138233";
 
@@ -150,7 +152,7 @@ let id = 0;
 export const PRODUCTS: Product[] = Object.entries(RAW).flatMap(([category, items]) =>
   items.map(([name, price, kw]) => {
     id++;
-    return { id, name, price, category, image: imageUrl(kw, category, id), fallback: fallbackUrl(kw, id) };
+    return { id, name, price, category, image: (IMAGES as Record<string, string>)[name] || imageUrl(kw, category, id), fallback: fallbackUrl(kw, id) };
   }),
 );
 
