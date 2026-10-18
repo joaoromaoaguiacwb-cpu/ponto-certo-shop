@@ -152,7 +152,8 @@ let id = 0;
 export const PRODUCTS: Product[] = Object.entries(RAW).flatMap(([category, items]) =>
   items.map(([name, price, kw]) => {
     id++;
-    return { id, name, price, category, image: (IMAGES as Record<string, string>)[name] || imageUrl(kw, category, id), fallback: fallbackUrl(kw, id) };
+    const local = (IMAGES as Record<string, string>)[name];
+    return { id, name, price, category, image: local ? `${local}?v=2` : imageUrl(kw, category, id), fallback: fallbackUrl(kw, id) };
   }),
 );
 
