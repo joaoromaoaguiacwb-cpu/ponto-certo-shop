@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { PRODUCTS, type Product } from "@/data/products";
+import type { Product } from "@/data/products";
+import { useProducts } from "./productsStore";
 
 export type CartItem = { id: number; qty: number };
 const KEY = "ponto-certo-cart";
 
 export function useCart() {
+  const products = useProducts();
   const [items, setItems] = useState<CartItem[]>([]);
   const [ready, setReady] = useState(false);
 
@@ -22,7 +24,7 @@ export function useCart() {
   const clear = () => setItems([]);
 
   const lines = items
-    .map((i) => ({ ...i, product: PRODUCTS.find((p) => p.id === i.id) as Product }))
+    .map((i) => ({ ...i, product: products.find((p) => p.id === i.id) as Product }))
     .filter((l) => l.product);
   const count = lines.reduce((s, l) => s + l.qty, 0);
   const total = lines.reduce((s, l) => s + l.qty * l.product.price, 0);

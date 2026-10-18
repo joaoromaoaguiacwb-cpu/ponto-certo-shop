@@ -1,11 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Search, ShoppingCart } from "lucide-react";
-import { CATEGORIES, PRODUCTS } from "@/data/products";
+import { CATEGORIES } from "@/data/products";
+import { useProducts } from "@/lib/productsStore";
+import { isAdminSession } from "@/lib/admin";
 import { useCart } from "@/lib/cart";
 import { ProductCard } from "@/components/ProductCard";
 import { CartPanel } from "@/components/CartPanel";
 import { Checkout } from "@/components/Checkout";
+import { AdminLogin } from "@/components/AdminLogin";
+import { AdminPanel } from "@/components/AdminPanel";
 import logo from "@/assets/logo.png.asset.json";
 
 export const Route = createFileRoute("/")({
@@ -23,12 +27,32 @@ export const Route = createFileRoute("/")({
 const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 function Index() {
+  const products = useProducts();
   const cart = useCart();
+  const [admin, setAdmin] = useState<"off" | "login" | "panel">("off");
+  const clicks = useRef<number[]>([]);
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("todos");
   const [view, setView] = useState<"shop" | "cart" | "checkout" | "success">("shop");
 
-  const list = useMemo(() => PRODUCTS.filter((p) => (cat === "todos" || p.category === cat) && norm(p.name).includes(norm(q))), [q, cat]);
+  // Promoções primeiro (dentro da categoria e em "Todos"); o resto mantém a ordem original.
+  const list = useMemo(
+    () =>
+      products
+        .filter((p) => (cat === "todos" || p.category === cat) && norm(p.name).includes(norm(q)))
+        .sort((a, b) => Number(!!b.onSale) - Number(!!a.onSale)),
+    [products, q, cat],
+  );
+
+  // 3 cliques rápidos no logo abrem o acesso administrativo
+  const onLogoClick = () => {
+    const now = Date.now();
+    clicks.current = [...clicks.current.filter((t) => now - t < 900), now];
+    if (clicks.current.length >= 3) {
+      clicks.current = [];
+      setAdmin(isAdminSession() ? "panel" : "login");
+    }
+  };
 
   const chip = (id: string, label: string) => (
     <button key={id} onClick={() => setCat(id)}
@@ -40,7 +64,7 @@ function Index() {
   return (
     <div className="min-h-screen bg-background pb-28">
       <header className="sticky top-0 z-30 bg-card/95 shadow-sm backdrop-blur">
-        <div className="flex justify-center py-2"><img src={logo.url} alt="Ponto Certo" className="h-12 w-auto sm:h-14" /></div>
+        <div className="flex justify-center py-2"><img src={logo.url} alt="Ponto Certo" onClick={onLogoClick} draggable={false} className="h-12 w-auto select-none sm:h-14" /></div>
         <div className="h-1 bg-brand-stripe" />
       </header>
 
@@ -75,6 +99,9 @@ function Index() {
           </span>
         )}
       </button>
+
+      {admin === "login" && <AdminLogin onSuccess={() => setAdmin("panel")} onClose={() => setAdmin("off")} />}
+      {admin === "panel" && <AdminPanel onClose={() => setAdmin("off")} />}
 
       {view === "cart" && <CartPanel cart={cart} onClose={() => setView("shop")} onCheckout={() => setView("checkout")} />}
       {view === "checkout" && <Checkout cart={cart} onBack={() => setView("cart")} onDone={() => setView("success")} />}

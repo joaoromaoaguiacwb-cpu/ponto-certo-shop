@@ -8,7 +8,14 @@ export function ProductCard({ product, onAdd }: { product: Product; onAdd: (id: 
   const [qty, setQty] = useState(1);
   return (
     <div className="flex flex-col overflow-hidden rounded-2xl bg-card shadow-card ring-1 ring-border">
-      <ProductImage product={product} className="aspect-square w-full" />
+      <div className="relative">
+        <ProductImage product={product} className="aspect-square w-full" />
+        {product.onSale && (
+          <span className="absolute left-2 top-2 rounded-full bg-accent px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-accent-foreground shadow-card">
+            Promoção
+          </span>
+        )}
+      </div>
       <div className="flex flex-1 flex-col gap-2 p-3">
         <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-tight text-foreground">{product.name}</h3>
         <p className="text-lg font-extrabold text-primary">{brl(product.price)}</p>

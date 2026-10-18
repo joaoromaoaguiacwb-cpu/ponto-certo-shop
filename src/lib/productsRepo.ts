@@ -1,0 +1,63 @@
+// ÚNICA camada de acesso aos produtos. Nesta demo os dados ficam no localStorage deste navegador.
+// Para ligar o Lovable Cloud, troque o corpo destas funções por chamadas ao banco; o resto do site não muda.
+import { PRODUCTS as SEED, type Product } from "@/data/products";
+
+const KEY = "ponto-certo-products-v1";
+
+export type ProductInput = { name: string; price: number; category: string; image: string; onSale: boolean };
+
+const seed = (): Product[] => SEED.map((p) => ({ ...p, onSale: !!p.onSale }));
+
+function read(): Product[] | null {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? (data as Product[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+// Lança erro se não couber (localStorage cheio); quem chama mostra o aviso.
+function write(list: Product[]) {
+  localStorage.setItem(KEY, JSON.stringify(list));
+}
+
+export async function listProducts(): Promise<Product[]> {
+  return read() ?? seed();
+}
+
+export async function createProduct(input: ProductInput): Promise<Product> {
+  const list = read() ?? seed();
+  const id = list.reduce((m, p) => Math.max(m, p.id), 0) + 1;
+  const product: Product = { id, ...input, fallback: "" };
+  write([...list, product]);
+  return product;
+}
+
+export async function updateProduct(id: number, patch: Partial<ProductInput>): Promise<void> {
+  const list = read() ?? seed();
+  write(
+    list.map((p) => {
+      if (p.id !== id) return p;
+      const next = { ...p, ...patch };
+      // Se a foto mudou, o plano B antigo não vale mais.
+      if (patch.image !== undefined && patch.image !== p.image) next.fallback = "";
+      return next;
+    }),
+  );
+}
+
+export async function deleteProduct(id: number): Promise<void> {
+  const list = read() ?? seed();
+  write(list.filter((p) => p.id !== id));
+}
+
+export async function resetProducts(): Promise<void> {
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    /* nada */
+  }
+}

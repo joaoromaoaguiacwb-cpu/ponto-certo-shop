@@ -4,7 +4,7 @@ import IMAGES from "./images.json";
 export const STORE_WHATSAPP = "5542984138233";
 
 export type Category = { id: string; name: string; emoji: string };
-export type Product = { id: number; name: string; price: number; category: string; image: string; fallback: string };
+export type Product = { id: number; name: string; price: number; category: string; image: string; fallback: string; onSale?: boolean };
 
 export const CATEGORIES: Category[] = [
   { id: "frutas", name: "Frutas", emoji: "🍎" },
@@ -149,11 +149,12 @@ const imageUrl = (kw: string, category: string, id: number) => {
 const fallbackUrl = (kw: string, id: number) => `https://loremflickr.com/320/320/${kw.split("-").join(",")}?lock=${id}`;
 
 let id = 0;
+// Lista ORIGINAL (semente). A loja lê os produtos por src/lib/productsStore.ts, que usa essa lista só no começo.
 export const PRODUCTS: Product[] = Object.entries(RAW).flatMap(([category, items]) =>
   items.map(([name, price, kw]) => {
     id++;
     const local = (IMAGES as Record<string, string>)[name];
-    return { id, name, price, category, image: local ? `${local}?v=3` : imageUrl(kw, category, id), fallback: fallbackUrl(kw, id) };
+    return { id, name, price, category, image: local ? `${local}?v=3` : imageUrl(kw, category, id), fallback: fallbackUrl(kw, id), onSale: false };
   }),
 );
 
