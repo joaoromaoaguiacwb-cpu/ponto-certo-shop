@@ -6,6 +6,9 @@ import { addProduct, editProduct, removeProduct, restoreProducts, useProducts } 
 import { fileToResizedDataUrl } from "@/lib/image";
 import { logoutAdmin } from "@/lib/admin";
 import { ProductImage } from "./ProductImage";
+import { Confirm } from "./Confirm";
+import { CouponsAdmin, RewardsAdmin } from "./AdminPromos";
+import { parseMoney } from "@/lib/money";
 
 const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
@@ -21,6 +24,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   const [editing, setEditing] = useState<Product | "new" | null>(null);
   const [deleting, setDeleting] = useState<Product | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [tab, setTab] = useState<"produtos" | "cupons" | "premios">("produtos");
 
   const list = useMemo(
     () => products.filter((p) => (cat === "todos" || p.category === cat) && norm(p.name).includes(norm(q))),
@@ -53,6 +57,16 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
         </div>
       </header>
 
+      <nav className="border-b bg-card">
+        <div className="mx-auto flex max-w-5xl gap-2 px-4 py-2">
+          {([["produtos", "Produtos"], ["cupons", "Cupons"], ["premios", "Prêmios"]] as const).map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)} aria-pressed={tab === id}
+              className={`rounded-full px-4 py-2 text-sm font-bold ${tab === id ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"}`}>{label}</button>
+          ))}
+        </div>
+      </nav>
+
+      {tab === "produtos" ? (
       <div className="mx-auto w-full max-w-5xl flex-1 overflow-y-auto px-4 pb-10">
         <div className="sticky top-0 z-10 -mx-4 bg-background/95 px-4 pb-3 pt-4 backdrop-blur">
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -103,6 +117,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
           </ul>
         )}
       </div>
+      ) : tab === "cupons" ? <CouponsAdmin /> : <RewardsAdmin />}
 
       {editing && <ProductForm product={editing === "new" ? null : editing} onClose={() => setEditing(null)} />}
 
@@ -133,24 +148,6 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
-function Confirm({ title, text, action, danger, onConfirm, onCancel }: {
-  title: string; text: string; action: string; danger?: boolean; onConfirm: () => void; onCancel: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-[80] grid place-items-center bg-black/50 p-4" onClick={onCancel}>
-      <div role="alertdialog" onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl bg-card p-5 shadow-float ring-1 ring-border">
-        <h2 className="text-lg font-extrabold">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{text}</p>
-        <div className="mt-4 flex gap-2">
-          <button onClick={onCancel} className="flex-1 rounded-full bg-muted px-4 py-2.5 font-bold">Cancelar</button>
-          <button onClick={onConfirm}
-            className={`flex-1 rounded-full px-4 py-2.5 font-extrabold ${danger ? "bg-destructive text-destructive-foreground" : "bg-primary text-primary-foreground"}`}>{action}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function ProductForm({ product, onClose }: { product: Product | null; onClose: () => void }) {
   const [f, setF] = useState<Form>(
     product ? { name: product.name, price: String(product.price).replace(".", ","), category: product.category, image: product.image, onSale: !!product.onSale } : emptyForm,
@@ -170,7 +167,7 @@ function ProductForm({ product, onClose }: { product: Product | null; onClose: (
 
   const save = async () => {
     const name = f.name.trim();
-    const price = Number(f.price.replace(/\./g, "").replace(",", "."));
+    const price = parseMoney(f.price);
     if (!name) return toast.error("Informe o nome do produto");
     if (!Number.isFinite(price) || price <= 0) return toast.error("Informe um preço válido");
     setBusy(true);

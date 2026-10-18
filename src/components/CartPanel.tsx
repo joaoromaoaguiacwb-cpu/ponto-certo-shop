@@ -2,6 +2,7 @@ import { Minus, Plus, Trash2, X } from "lucide-react";
 import { brl } from "@/data/products";
 import type { Cart } from "@/lib/cart";
 import { ProductImage } from "./ProductImage";
+import { PromoBox } from "./PromoBox";
 
 export function CartPanel({ cart, onClose, onCheckout }: { cart: Cart; onClose: () => void; onCheckout: () => void }) {
   return (
@@ -45,6 +46,13 @@ export function CartPanel({ cart, onClose, onCheckout }: { cart: Cart; onClose: 
               <button onClick={cart.clear} className="w-full py-2 text-sm font-semibold text-accent">Limpar carrinho</button>
             </div>
             <footer className="space-y-3 border-t bg-card p-4">
+              <PromoBox cart={cart} />
+              {cart.discount > 0 && (
+                <div className="space-y-0.5 text-sm text-muted-foreground">
+                  <div className="flex justify-between"><span>Subtotal</span><span>{brl(cart.subtotal)}</span></div>
+                  <div className="flex justify-between"><span>Desconto</span><span>-{brl(cart.discount)}</span></div>
+                </div>
+              )}
               <div className="flex items-center justify-between text-lg">
                 <span className="font-semibold">Total</span>
                 <span className="text-2xl font-extrabold text-primary">{brl(cart.total)}</span>

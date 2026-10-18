@@ -3,6 +3,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { brl, STORE_WHATSAPP } from "@/data/products";
 import type { Cart } from "@/lib/cart";
+import { rewardLabel } from "@/lib/order";
 
 const PAYMENTS = ["Pix", "Cartão de crédito", "Cartão de débito", "Dinheiro"];
 type Form = { nome: string; telefone: string; rua: string; numero: string; bairro: string; cidade: string; complemento: string; pagamento: string; troco: string };
@@ -44,7 +45,11 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
     const endereco = `${f.rua.trim()}, ${f.numero.trim()} - ${f.bairro.trim()}, ${f.cidade.trim()}${f.complemento.trim() ? ` (${f.complemento.trim()})` : ""}`;
     const pagamento = f.pagamento === "Dinheiro" && f.troco.trim() ? `Dinheiro (troco para ${f.troco.trim()})` : f.pagamento;
     const produtos = cart.lines.map((l) => `• ${l.qty}x ${l.product.name} — ${brl(l.qty * l.product.price)}`).join("\n");
-    const msg = `🛒 *NOVO PEDIDO - PONTO CERTO*\n\n👤 Cliente: ${f.nome.trim()}\n📞 Telefone: ${f.telefone.trim()}\n📍 Endereço: ${endereco}\n💳 Pagamento: ${pagamento}\n\n*Produtos:*\n${produtos}\n\n💰 *TOTAL: ${brl(cart.total)}*\n\nObrigado por comprar no Ponto Certo! Seu pedido será confirmado em instantes. ✅`;
+    const extras = [
+      cart.coupon ? `\n🎟️ Cupom ${cart.coupon.code}: -${brl(cart.discount)} (subtotal ${brl(cart.subtotal)})` : "",
+      cart.earned.length ? `\n🎁 *Prêmios:* ${cart.earned.map(rewardLabel).join(", ")}` : "",
+    ].join("");
+    const msg = `🛒 *NOVO PEDIDO - PONTO CERTO*\n\n👤 Cliente: ${f.nome.trim()}\n📞 Telefone: ${f.telefone.trim()}\n📍 Endereço: ${endereco}\n💳 Pagamento: ${pagamento}\n\n*Produtos:*\n${produtos}${extras}\n\n💰 *TOTAL: ${brl(cart.total)}*\n\nObrigado por comprar no Ponto Certo! Seu pedido será confirmado em instantes. ✅`;
     window.open(`https://wa.me/${STORE_WHATSAPP}?text=${encodeURIComponent(msg)}`, "_blank");
     cart.clear();
     onDone();
@@ -105,6 +110,15 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
               <li key={l.id} className="flex justify-between gap-2"><span>{l.qty}x {l.product.name}</span><span className="shrink-0 font-semibold">{brl(l.qty * l.product.price)}</span></li>
             ))}
           </ul>
+          {cart.discount > 0 && (
+            <div className="mt-3 space-y-0.5 border-t pt-3 text-sm text-muted-foreground">
+              <div className="flex justify-between"><span>Subtotal</span><span>{brl(cart.subtotal)}</span></div>
+              <div className="flex justify-between"><span>Cupom {cart.coupon?.code}</span><span>-{brl(cart.discount)}</span></div>
+            </div>
+          )}
+          {cart.earned.length > 0 && (
+            <p className="mt-3 rounded-xl bg-muted px-3 py-2 text-sm font-semibold">🎁 Você ganhou: {cart.earned.map(rewardLabel).join(", ")}</p>
+          )}
           <div className="mt-3 flex justify-between border-t pt-3 text-lg font-extrabold"><span>Total</span><span className="text-primary">{brl(cart.total)}</span></div>
         </section>
         <button onClick={submit} className="w-full rounded-full bg-whatsapp py-4 text-lg font-extrabold text-primary-foreground shadow-card active:scale-[.98]">
