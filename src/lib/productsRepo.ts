@@ -4,7 +4,19 @@ import { PRODUCTS as SEED, type Product } from "@/data/products";
 
 const KEY = "ponto-certo-products-v1";
 
-export type ProductInput = { name: string; price: number; category: string; image: string; onSale: boolean };
+import { round2 } from "./money";
+
+export type ProductInput = {
+  name: string;
+  price: number;
+  category: string;
+  image: string;
+  onSale: boolean;
+  soldOut: boolean;
+  unit: "kg" | "un";
+  wholesale: { minQty: number; price: number } | null; // preço de atacado a partir de X
+};
+export type PriceSnapshot = Record<number, { price: number; wholesale: Product["wholesale"] }>;
 
 const seed = (): Product[] => SEED.map((p) => ({ ...p, onSale: !!p.onSale }));
 
@@ -60,4 +72,32 @@ export async function resetProducts(): Promise<void> {
   } catch {
     /* nada */
   }
+}
+
+// Reajusta preços (e o preço de atacado) de uma categoria ou de todos. Retorna o estado anterior para desfazer.
+export async function adjustPrices(category: string, percent: number): Promise<{ count: number; before: PriceSnapshot }> {
+  const list = read() ?? seed();
+  const before: PriceSnapshot = {};
+  const factor = 1 + percent / 100;
+  const next = list.map((p) => {
+    if (category !== "todos" && p.category !== category) return p;
+    before[p.id] = { price: p.price, wholesale: p.wholesale ?? null };
+    return {
+      ...p,
+      price: Math.max(0.01, round2(p.price * factor)),
+      wholesale: p.wholesale ? { ...p.wholesale, price: Math.max(0.01, round2(p.wholesale.price * factor)) } : p.wholesale,
+    };
+  });
+  write(next);
+  return { count: Object.keys(before).length, before };
+}
+
+export async function restorePrices(before: PriceSnapshot): Promise<void> {
+  const list = read() ?? seed();
+  write(
+    list.map((p) => {
+      const b = before[p.id];
+      return b ? { ...p, price: b.price, wholesale: b.wholesale } : p;
+    }),
+  );
 }

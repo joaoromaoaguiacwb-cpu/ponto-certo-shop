@@ -4,7 +4,7 @@ import IMAGES from "./images.json";
 export const STORE_WHATSAPP = "5542984138233";
 
 export type Category = { id: string; name: string; emoji: string };
-export type Product = { id: number; name: string; price: number; category: string; image: string; fallback: string; onSale?: boolean };
+export type Product = { id: number; name: string; price: number; category: string; image: string; fallback: string; onSale?: boolean; soldOut?: boolean; unit?: "kg" | "un"; wholesale?: { minQty: number; price: number } | null };
 
 export const CATEGORIES: Category[] = [
   { id: "frutas", name: "Frutas", emoji: "🍎" },

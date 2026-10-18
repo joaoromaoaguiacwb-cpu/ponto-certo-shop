@@ -4,6 +4,7 @@ import { Search, ShoppingCart } from "lucide-react";
 import { CATEGORIES } from "@/data/products";
 import { useProducts } from "@/lib/productsStore";
 import { isAdminSession } from "@/lib/admin";
+import { useSettings } from "@/lib/settingsStore";
 import { useCart } from "@/lib/cart";
 import { ProductCard } from "@/components/ProductCard";
 import { CartPanel } from "@/components/CartPanel";
@@ -24,10 +25,12 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
+const rank = (p: { onSale?: boolean | undefined; soldOut?: boolean | undefined }) => (p.soldOut ? 2 : p.onSale ? 0 : 1);
 const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 function Index() {
   const products = useProducts();
+  const settings = useSettings();
   const cart = useCart();
   const [admin, setAdmin] = useState<"off" | "login" | "panel">("off");
   const clicks = useRef<number[]>([]);
@@ -40,7 +43,8 @@ function Index() {
     () =>
       products
         .filter((p) => (cat === "todos" || p.category === cat) && norm(p.name).includes(norm(q)))
-        .sort((a, b) => Number(!!b.onSale) - Number(!!a.onSale)),
+        // promoções primeiro, esgotados por último
+        .sort((a, b) => rank(a) - rank(b)),
     [products, q, cat],
   );
 
@@ -67,6 +71,13 @@ function Index() {
         <div className="flex justify-center py-2"><img src={logo.url} alt="Ponto Certo" onClick={onLogoClick} draggable={false} className="h-12 w-auto select-none sm:h-14" /></div>
         <div className="h-1 bg-brand-stripe" />
       </header>
+
+      {!settings.open && (
+        <div className="bg-accent px-4 py-2 text-center text-sm font-bold text-accent-foreground">🔒 Loja fechada. {settings.closedMessage}</div>
+      )}
+      {settings.open && settings.bannerEnabled && settings.bannerText.trim() && (
+        <div className="bg-secondary px-4 py-2 text-center text-sm font-bold text-secondary-foreground">📢 {settings.bannerText}</div>
+      )}
 
       <div className="mx-auto max-w-7xl px-4">
         <div className="relative mt-4">

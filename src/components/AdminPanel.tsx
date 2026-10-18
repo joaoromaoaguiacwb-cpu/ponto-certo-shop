@@ -1,21 +1,28 @@
 import { useMemo, useRef, useState } from "react";
-import { LogOut, Pencil, Plus, RotateCcw, Search, Tag, Trash2, Upload, X } from "lucide-react";
+import { LogOut, Pencil, Plus, RotateCcw, Search, Tag, TrendingUp, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { brl, CATEGORIES, type Product } from "@/data/products";
-import { addProduct, editProduct, removeProduct, restoreProducts, useProducts } from "@/lib/productsStore";
+import { addProduct, adjustPrices, editProduct, removeProduct, restorePrices, restoreProducts, useProducts } from "@/lib/productsStore";
 import { fileToResizedDataUrl } from "@/lib/image";
 import { logoutAdmin } from "@/lib/admin";
 import { ProductImage } from "./ProductImage";
 import { Confirm } from "./Confirm";
 import { CouponsAdmin, RewardsAdmin } from "./AdminPromos";
+import { StoreAdmin } from "./AdminStore";
+import { Modal } from "./AdminUi";
+import { hasWholesale, unitOf } from "@/lib/pricing";
 import { parseMoney } from "@/lib/money";
 
 const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
-type Form = { name: string; price: string; category: string; image: string; onSale: boolean };
-const emptyForm: Form = { name: "", price: "", category: CATEGORIES[0].id, image: "", onSale: false };
+type Form = {
+  name: string; price: string; category: string; image: string; onSale: boolean;
+  soldOut: boolean; unit: "kg" | "un"; wMin: string; wPrice: string;
+};
+const emptyForm: Form = { name: "", price: "", category: CATEGORIES[0]?.id ?? "", image: "", onSale: false, soldOut: false, unit: "un", wMin: "", wPrice: "" };
 
 const saveError = () => toast.error("Não foi possível salvar. O espaço do navegador pode estar cheio (tente uma foto menor ou um link).");
+const field = "mt-1 w-full rounded-xl border-2 border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary";
 
 export function AdminPanel({ onClose }: { onClose: () => void }) {
   const products = useProducts();
@@ -24,13 +31,22 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   const [editing, setEditing] = useState<Product | "new" | null>(null);
   const [deleting, setDeleting] = useState<Product | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [tab, setTab] = useState<"produtos" | "cupons" | "premios">("produtos");
+  const [tab, setTab] = useState<"produtos" | "cupons" | "premios" | "loja">("produtos");
+  const [bulk, setBulk] = useState(false);
 
   const list = useMemo(
     () => products.filter((p) => (cat === "todos" || p.category === cat) && norm(p.name).includes(norm(q))),
     [products, q, cat],
   );
   const catName = (id: string) => CATEGORIES.find((c) => c.id === id)?.name ?? id;
+
+  const toggleSoldOut = async (p: Product) => {
+    try {
+      await editProduct(p.id, { soldOut: !p.soldOut });
+    } catch {
+      saveError();
+    }
+  };
 
   const togglePromo = async (p: Product) => {
     try {
@@ -58,8 +74,8 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
       </header>
 
       <nav className="border-b bg-card">
-        <div className="mx-auto flex max-w-5xl gap-2 px-4 py-2">
-          {([["produtos", "Produtos"], ["cupons", "Cupons"], ["premios", "Prêmios"]] as const).map(([id, label]) => (
+        <div className="mx-auto flex max-w-5xl gap-2 overflow-x-auto px-4 py-2">
+          {([["produtos", "Produtos"], ["cupons", "Cupons"], ["premios", "Prêmios"], ["loja", "Loja"]] as const).map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} aria-pressed={tab === id}
               className={`rounded-full px-4 py-2 text-sm font-bold ${tab === id ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"}`}>{label}</button>
           ))}
@@ -84,6 +100,8 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm text-muted-foreground">{list.length} de {products.length} produtos</span>
             <div className="flex gap-2">
+              <button onClick={() => setBulk(true)}
+                className="flex items-center gap-1.5 rounded-full bg-card px-3 py-2 text-xs font-bold text-foreground ring-1 ring-border"><TrendingUp size={14} /> Reajustar preços</button>
               <button onClick={() => setConfirmReset(true)}
                 className="flex items-center gap-1.5 rounded-full bg-card px-3 py-2 text-xs font-bold text-foreground ring-1 ring-border"><RotateCcw size={14} /> Restaurar originais</button>
               <button onClick={() => setEditing("new")}
@@ -97,27 +115,37 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
         ) : (
           <ul className="flex flex-col gap-2">
             {list.map((p) => (
-              <li key={p.id} className="flex items-center gap-3 rounded-2xl bg-card p-2 shadow-card ring-1 ring-border">
+              <li key={p.id} className={`flex flex-wrap items-center gap-2 rounded-2xl bg-card p-2 shadow-card ring-1 ring-border ${p.soldOut ? "opacity-75" : ""}`}>
                 <ProductImage product={p} className="h-14 w-14 shrink-0 rounded-xl" />
-                <div className="min-w-0 flex-1">
+                <div className="min-w-[9rem] flex-1">
                   <p className="truncate text-sm font-semibold">{p.name}</p>
-                  <p className="truncate text-xs text-muted-foreground">{catName(p.category)}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {catName(p.category)}{unitOf(p) === "kg" ? " · por kg" : ""}{hasWholesale(p) ? " · atacado" : ""}
+                  </p>
                   <p className="text-sm font-extrabold text-primary">{brl(p.price)}</p>
                 </div>
-                <button onClick={() => togglePromo(p)} aria-pressed={!!p.onSale}
-                  className={`flex shrink-0 items-center gap-1 rounded-full px-3 py-2 text-xs font-bold ${p.onSale ? "bg-accent text-accent-foreground" : "bg-muted text-foreground"}`}>
-                  <Tag size={14} /> {p.onSale ? "Em promoção" : "Promoção"}
-                </button>
-                <button aria-label={`Editar ${p.name}`} onClick={() => setEditing(p)}
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-muted text-primary"><Pencil size={16} /></button>
-                <button aria-label={`Apagar ${p.name}`} onClick={() => setDeleting(p)}
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-muted text-destructive"><Trash2 size={16} /></button>
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  <button onClick={() => toggleSoldOut(p)} aria-pressed={!!p.soldOut}
+                    className={`rounded-full px-3 py-2 text-xs font-bold ${p.soldOut ? "bg-foreground text-background" : "bg-muted text-foreground"}`}>
+                    {p.soldOut ? "Esgotado" : "Em estoque"}
+                  </button>
+                  <button onClick={() => togglePromo(p)} aria-pressed={!!p.onSale}
+                    className={`flex items-center gap-1 rounded-full px-3 py-2 text-xs font-bold ${p.onSale ? "bg-accent text-accent-foreground" : "bg-muted text-foreground"}`}>
+                    <Tag size={14} /> {p.onSale ? "Em promoção" : "Promoção"}
+                  </button>
+                  <button aria-label={`Editar ${p.name}`} onClick={() => setEditing(p)}
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-muted text-primary"><Pencil size={16} /></button>
+                  <button aria-label={`Apagar ${p.name}`} onClick={() => setDeleting(p)}
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-muted text-destructive"><Trash2 size={16} /></button>
+                </div>
               </li>
             ))}
           </ul>
         )}
       </div>
-      ) : tab === "cupons" ? <CouponsAdmin /> : <RewardsAdmin />}
+      ) : tab === "cupons" ? <CouponsAdmin /> : tab === "premios" ? <RewardsAdmin /> : <StoreAdmin />}
+
+      {bulk && <BulkPriceModal onClose={() => setBulk(false)} />}
 
       {editing && <ProductForm product={editing === "new" ? null : editing} onClose={() => setEditing(null)} />}
 
@@ -150,7 +178,10 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
 function ProductForm({ product, onClose }: { product: Product | null; onClose: () => void }) {
   const [f, setF] = useState<Form>(
-    product ? { name: product.name, price: String(product.price).replace(".", ","), category: product.category, image: product.image, onSale: !!product.onSale } : emptyForm,
+    product ? { name: product.name, price: String(product.price).replace(".", ","), category: product.category, image: product.image, onSale: !!product.onSale,
+        soldOut: !!product.soldOut, unit: unitOf(product),
+        wMin: product.wholesale?.minQty ? String(product.wholesale.minQty).replace(".", ",") : "",
+        wPrice: product.wholesale?.price ? String(product.wholesale.price).replace(".", ",") : "" } : emptyForm,
   );
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -170,9 +201,21 @@ function ProductForm({ product, onClose }: { product: Product | null; onClose: (
     const price = parseMoney(f.price);
     if (!name) return toast.error("Informe o nome do produto");
     if (!Number.isFinite(price) || price <= 0) return toast.error("Informe um preço válido");
+    let wholesale: { minQty: number; price: number } | null = null;
+    if (f.wMin.trim() || f.wPrice.trim()) {
+      const minQty = parseMoney(f.wMin);
+      const wPrice = parseMoney(f.wPrice);
+      if (!Number.isFinite(minQty) || minQty <= 0 || !Number.isFinite(wPrice) || wPrice <= 0)
+        return toast.error("Preencha a quantidade e o preço de atacado (ou deixe os dois vazios)");
+      if (wPrice >= price) return toast.error("O preço de atacado deve ser menor que o preço normal");
+      wholesale = { minQty, price: Math.round(wPrice * 100) / 100 };
+    }
     setBusy(true);
     try {
-      const data = { name, price: Math.round(price * 100) / 100, category: f.category, image: f.image.trim(), onSale: f.onSale };
+      const data = {
+        name, price: Math.round(price * 100) / 100, category: f.category, image: f.image.trim(), onSale: f.onSale,
+        soldOut: f.soldOut, unit: f.unit, wholesale,
+      };
       if (product) await editProduct(product.id, data);
       else await addProduct(data);
       toast.success(product ? "Produto atualizado" : "Produto adicionado");
@@ -223,8 +266,33 @@ function ProductForm({ product, onClose }: { product: Product | null; onClose: (
           </div>
         </div>
 
+        <div className="mt-3">
+          <label className="text-xs font-bold">Vendido por</label>
+          <select value={f.unit} onChange={(e) => set("unit", e.target.value as "kg" | "un")} className={field}>
+            <option value="un">Unidade (1, 2, 3...)</option>
+            <option value="kg">Quilo (0,5 kg, 1 kg, 1,5 kg...) — o preço é por kg</option>
+          </select>
+        </div>
+
+        <div className="mt-3 rounded-xl bg-muted p-3">
+          <p className="text-xs font-bold">Preço de atacado (opcional)</p>
+          <div className="mt-1 grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs">A partir de ({f.unit === "kg" ? "kg" : "un"})</label>
+              <input value={f.wMin} inputMode="decimal" placeholder="6" onChange={(e) => set("wMin", e.target.value)} className={field} />
+            </div>
+            <div>
+              <label className="text-xs">Preço (R$)</label>
+              <input value={f.wPrice} inputMode="decimal" placeholder="0,00" onChange={(e) => set("wPrice", e.target.value)} className={field} />
+            </div>
+          </div>
+        </div>
+
         <label className="mt-4 flex items-center gap-2 text-sm font-semibold">
           <input type="checkbox" checked={f.onSale} onChange={(e) => set("onSale", e.target.checked)} className="h-4 w-4" /> Em promoção
+        </label>
+        <label className="mt-2 flex items-center gap-2 text-sm font-semibold">
+          <input type="checkbox" checked={f.soldOut} onChange={(e) => set("soldOut", e.target.checked)} className="h-4 w-4" /> Esgotado
         </label>
 
         <div className="mt-5 flex gap-2">
@@ -234,5 +302,69 @@ function ProductForm({ product, onClose }: { product: Product | null; onClose: (
         </div>
       </div>
     </div>
+  );
+}
+
+function BulkPriceModal({ onClose }: { onClose: () => void }) {
+  const products = useProducts();
+  const [category, setCategory] = useState("todos");
+  const [dir, setDir] = useState<"up" | "down">("up");
+  const [pct, setPct] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const value = parseMoney(pct);
+  const valid = Number.isFinite(value) && value > 0 && (dir === "up" || value < 100);
+  const percent = dir === "up" ? value : -value;
+  const scope = products.filter((p) => category === "todos" || p.category === category);
+  const sample = scope[0];
+  const after = (v: number) => Math.max(0.01, Math.round(v * (1 + percent / 100) * 100) / 100);
+
+  const apply = async () => {
+    if (!valid) return toast.error("Informe uma porcentagem válida");
+    if (scope.length === 0) return toast.error("Nenhum produto nessa categoria");
+    setBusy(true);
+    try {
+      const { count, before } = await adjustPrices(category, percent);
+      toast.success(`${count} produtos reajustados em ${dir === "up" ? "+" : "-"}${String(value).replace(".", ",")}%`, {
+        duration: 10000,
+        action: { label: "Desfazer", onClick: () => { void restorePrices(before).then(() => toast.success("Preços restaurados")).catch(saveError); } },
+      });
+      onClose();
+    } catch {
+      saveError();
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal title="Reajustar preços" onClose={onClose}>
+      <label className="mt-4 block text-xs font-bold">Categoria</label>
+      <select value={category} onChange={(e) => setCategory(e.target.value)} className={field}>
+        <option value="todos">Todos os produtos</option>
+        {CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
+      </select>
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-bold">Ação</label>
+          <select value={dir} onChange={(e) => setDir(e.target.value as "up" | "down")} className={field}>
+            <option value="up">Aumentar</option>
+            <option value="down">Diminuir</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-bold">Porcentagem (%)</label>
+          <input value={pct} inputMode="decimal" placeholder="10" onChange={(e) => setPct(e.target.value)} className={field} />
+        </div>
+      </div>
+      <p className="mt-3 rounded-xl bg-muted px-3 py-2 text-sm">
+        {scope.length} produtos serão alterados (inclui o preço de atacado).
+        {valid && sample && <> Ex.: <b>{sample.name}</b> vai de {brl(sample.price)} para <b>{brl(after(sample.price))}</b>.</>}
+      </p>
+      <p className="mt-2 text-xs text-muted-foreground">Depois de aplicar, aparece um botão "Desfazer" por alguns segundos.</p>
+      <div className="mt-5 flex gap-2">
+        <button onClick={onClose} className="flex-1 rounded-full bg-muted px-4 py-2.5 font-bold">Cancelar</button>
+        <button onClick={apply} disabled={busy || !valid} className="flex-1 rounded-full bg-primary px-4 py-2.5 font-extrabold text-primary-foreground disabled:opacity-60">Aplicar</button>
+      </div>
+    </Modal>
   );
 }

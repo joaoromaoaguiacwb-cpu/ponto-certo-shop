@@ -42,6 +42,17 @@ export async function removeProduct(id: number) {
   set(await repo.listProducts());
 }
 
+export async function adjustPrices(category: string, percent: number) {
+  const r = await repo.adjustPrices(category, percent);
+  set(await repo.listProducts());
+  return r;
+}
+
+export async function restorePrices(before: repo.PriceSnapshot) {
+  await repo.restorePrices(before);
+  set(await repo.listProducts());
+}
+
 export async function restoreProducts() {
   await repo.resetProducts();
   set(await repo.listProducts());

@@ -1,17 +1,20 @@
 import { useEffect, useState } from "react";
-import { brl, type Product } from "@/data/products";
+import { brl } from "@/data/products";
 import { useProducts } from "./productsStore";
 import { usePromos } from "./promosStore";
+import { useSettings } from "./settingsStore";
 import { normCode } from "./promosRepo";
 import { calcRewards, couponDiscount } from "./order";
 import { round2 } from "./money";
+import { lineTotal, unitPriceFor } from "./pricing";
 
-export type CartItem = { id: number; qty: number };
+export type CartItem = { id: number; qty: number; note?: string | undefined };
 const KEY = "ponto-certo-cart";
 
 export function useCart() {
   const products = useProducts();
   const { coupons, rewards } = usePromos();
+  const settings = useSettings();
   const [items, setItems] = useState<CartItem[]>([]);
   const [ready, setReady] = useState(false);
   const [code, setCode] = useState("");
@@ -22,18 +25,35 @@ export function useCart() {
   }, []);
   useEffect(() => { if (ready) localStorage.setItem(KEY, JSON.stringify(items)); }, [items, ready]);
 
-  const add = (id: number, qty: number) =>
-    setItems((c) => c.some((i) => i.id === id) ? c.map((i) => i.id === id ? { ...i, qty: i.qty + qty } : i) : [...c, { id, qty }]);
+  const add = (id: number, qty: number, note?: string) => {
+    const n = note?.trim() || undefined;
+    setItems((c) => c.some((i) => i.id === id)
+      ? c.map((i) => i.id === id ? { ...i, qty: i.qty + qty, note: n ?? i.note } : i)
+      : [...c, { id, qty, note: n }]);
+  };
   const setQty = (id: number, qty: number) =>
     setItems((c) => qty <= 0 ? c.filter((i) => i.id !== id) : c.map((i) => i.id === id ? { ...i, qty } : i));
+  const setNote = (id: number, note: string) =>
+    setItems((c) => c.map((i) => i.id === id ? { ...i, note: note || undefined } : i));
   const remove = (id: number) => setItems((c) => c.filter((i) => i.id !== id));
   const clear = () => { setItems([]); setCode(""); };
 
-  const lines = items
-    .map((i) => ({ ...i, product: products.find((p) => p.id === i.id) as Product }))
-    .filter((l) => l.product);
-  const count = lines.reduce((s, l) => s + l.qty, 0);
-  const subtotal = round2(lines.reduce((s, l) => s + l.qty * l.product.price, 0));
+  const lines = items.flatMap((i) => {
+    const product = products.find((p) => p.id === i.id);
+    if (!product) return [];
+    return [{
+      ...i,
+      product,
+      unitPrice: unitPriceFor(product, i.qty),
+      lineTotal: lineTotal(product, i.qty),
+      soldOut: !!product.soldOut,
+    }];
+  });
+  const count = lines.length > 0 ? lines.reduce((s, l) => s + Math.ceil(l.qty), 0) : 0;
+  const subtotal = round2(lines.reduce((s, l) => s + l.lineTotal, 0));
+  const hasSoldOut = lines.some((l) => l.soldOut);
+  const minOrder = settings.minOrder;
+  const missingMin = minOrder > 0 && subtotal < minOrder ? round2(minOrder - subtotal) : 0;
 
   // Cupom aplicado: só vale se ainda estiver ativo e a compra atingir o mínimo.
   const found = code ? coupons.find((c) => c.active && normCode(c.code) === code) : undefined;
@@ -57,6 +77,10 @@ export function useCart() {
   };
   const removeCoupon = () => setCode("");
 
-  return { lines, count, subtotal, discount, total, coupon, couponCode: code, couponProblem, hasCoupons, earned, next, applyCoupon, removeCoupon, add, setQty, remove, clear };
+  return {
+    lines, count, subtotal, discount, total, coupon, couponCode: code, couponProblem, hasCoupons, earned, next,
+    hasSoldOut, minOrder, missingMin,
+    applyCoupon, removeCoupon, add, setQty, setNote, remove, clear,
+  };
 }
 export type Cart = ReturnType<typeof useCart>;
