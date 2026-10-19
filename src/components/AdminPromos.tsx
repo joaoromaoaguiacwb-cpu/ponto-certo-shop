@@ -53,15 +53,15 @@ function CouponForm({ coupon, all, onClose }: { coupon: Coupon | null; all: Coup
   const [active, setActive] = useState(coupon?.active ?? true);
   const [busy, setBusy] = useState(false);
 
-  const save = async (): Promise<unknown> => {
+  const save = async () => {
     const c = normCode(code);
     const v = parseMoney(value);
     const min = minTotal.trim() ? parseMoney(minTotal) : 0;
-    if (!c) return toast.error("Informe o código do cupom");
-    if (all.some((x) => x.id !== coupon?.id && normCode(x.code) === c)) return toast.error("Já existe um cupom com esse código");
-    if (!Number.isFinite(v) || v <= 0) return toast.error("Informe o valor do desconto");
-    if (type === "percent" && v > 100) return toast.error("A porcentagem não pode passar de 100");
-    if (!Number.isFinite(min) || min < 0) return toast.error("Compra mínima inválida");
+    if (!c) return void toast.error("Informe o código do cupom");
+    if (all.some((x) => x.id !== coupon?.id && normCode(x.code) === c)) return void toast.error("Já existe um cupom com esse código");
+    if (!Number.isFinite(v) || v <= 0) return void toast.error("Informe o valor do desconto");
+    if (type === "percent" && v > 100) return void toast.error("A porcentagem não pode passar de 100");
+    if (!Number.isFinite(min) || min < 0) return void toast.error("Compra mínima inválida");
     setBusy(true);
     try {
       const data = { code: c, type, value: round2(v), minTotal: round2(min), active };
@@ -142,11 +142,11 @@ function RewardForm({ reward, onClose }: { reward: Reward | null; onClose: () =>
   const [raffle, setRaffle] = useState(reward?.raffle ?? false);
   const [busy, setBusy] = useState(false);
 
-  const save = async (): Promise<unknown> => {
+  const save = async () => {
     const n = name.trim();
     const amount = parseMoney(every);
-    if (!n) return toast.error("Informe o prêmio");
-    if (!Number.isFinite(amount) || amount <= 0) return toast.error("Informe o valor em compras");
+    if (!n) return void toast.error("Informe o prêmio");
+    if (!Number.isFinite(amount) || amount <= 0) return void toast.error("Informe o valor em compras");
     setBusy(true);
     try {
       const data = { name: n, everyAmount: round2(amount), repeat, active, raffle };
