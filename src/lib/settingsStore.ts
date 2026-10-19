@@ -1,7 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import * as repo from "./settingsRepo";
 
-export type { Settings, Neighborhood, SettingsPatch, NeighborhoodInput } from "./settingsRepo";
+export type { Settings, Neighborhood, SettingsPatch, NeighborhoodInput, DaySchedule } from "./settingsRepo";
 
 let state: repo.Settings = repo.DEFAULT_SETTINGS;
 let loaded = false;

@@ -5,7 +5,7 @@ import { brl, type Product } from "@/data/products";
 import { fmtQty, hasWholesale, labelQty, stepOf, unitOf, unitPriceFor } from "@/lib/pricing";
 import { ProductImage } from "./ProductImage";
 
-export function ProductCard({ product, onAdd }: { product: Product; onAdd: (id: number, q: number, note?: string) => void }) {
+export function ProductCard({ product, onAdd, bought = false }: { product: Product; onAdd: (id: number, q: number, note?: string) => void; bought?: boolean | undefined }) {
   const step = stepOf(product);
   const kg = unitOf(product) === "kg";
   const start = kg ? 1 : step; // peso começa em 1 kg (dá para baixar até 0,5 kg)
@@ -31,6 +31,9 @@ export function ProductCard({ product, onAdd }: { product: Product; onAdd: (id: 
               Promoção
             </span>
           )
+        )}
+        {bought && (
+          <span className="absolute bottom-2 left-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground shadow-card">★ Você já pediu</span>
         )}
       </div>
       <div className="flex flex-1 flex-col gap-2 p-3">

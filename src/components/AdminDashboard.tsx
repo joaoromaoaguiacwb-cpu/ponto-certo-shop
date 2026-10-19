@@ -18,6 +18,65 @@ const monthName = (key: string) => {
 const fmtKg = (n: number) => `${(Math.round(n * 10) / 10).toLocaleString("pt-BR")} kg`;
 const ticket = (a: Agg) => (a.count ? a.value / a.count : 0);
 
+type Top = { name: string; unit: "kg" | "un"; qty: number; value: number };
+function topProducts(list: Order[]): Top[] {
+  const m = new Map<string, Top>();
+  for (const o of list)
+    for (const l of o.lines ?? []) {
+      const cur = m.get(l.name) ?? { name: l.name, unit: l.unit, qty: 0, value: 0 };
+      cur.qty += l.qty;
+      cur.value += l.total;
+      m.set(l.name, cur);
+    }
+  return [...m.values()].sort((a, b) => b.value - a.value).slice(0, 10);
+}
+
+function TopProducts({ list }: { list: Order[] }) {
+  const top = topProducts(list);
+  if (top.length === 0) return null;
+  const max = Math.max(1, ...top.map((t) => t.value));
+  return (
+    <div className="rounded-2xl bg-card p-4 shadow-card ring-1 ring-border">
+      <h3 className="font-extrabold text-primary">Mais vendidos</h3>
+      <ol className="mt-3 space-y-2.5">
+        {top.map((t, i) => (
+          <li key={t.name}>
+            <div className="flex items-baseline justify-between gap-2 text-sm">
+              <span className="min-w-0 truncate font-semibold">{i + 1}. {t.name}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">{t.unit === "kg" ? fmtKg(t.qty) : `${t.qty} un`} · <b className="text-foreground">{brl(t.value)}</b></span>
+            </div>
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${(t.value / max) * 100}%` }} /></div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+// Planilha para Excel/Google Sheets (separador ";" e vírgula decimal, como no Brasil).
+function exportCsv(list: Order[], demo: boolean) {
+  const esc = (v: string) => (/[;"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  const dec = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
+  const rows = [["Pedido", "Data", "Hora", "Valor (R$)", "Itens (un)", "Peso (kg)", "Cupom", "Produtos"]];
+  for (const o of list) {
+    const d = new Date(o.at);
+    rows.push([
+      String(o.id), d.toLocaleDateString("pt-BR"), d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+      dec(o.total), String(o.units), dec(o.kg), o.coupon ?? "",
+      (o.lines ?? []).map((l) => `${l.unit === "kg" ? `${dec(l.qty)} kg` : `${l.qty}x`} ${l.name}`).join(" | "),
+    ]);
+  }
+  const csv = "\uFEFF" + rows.map((r) => r.map(esc).join(";")).join("\r\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${demo ? "vendas-exemplo" : "vendas"}-${dayKey(Date.now())}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string | undefined }) {
   return (
     <div className="rounded-2xl bg-card p-4 shadow-card ring-1 ring-border">
@@ -74,7 +133,10 @@ export function AdminDashboard() {
           <b>Dados de exemplo.</b> Ainda não há pedidos enviados neste navegador. Cada pedido enviado pelo site passa a aparecer aqui. Com o Cloud, aparecem os pedidos de todos os clientes.
         </p>
       )}
-      <div className="flex flex-wrap gap-2">{seg("dia", "Por dia")}{seg("mes", "Mês atual")}{seg("meses", "Meses anteriores")}</div>
+      <div className="flex flex-wrap items-center gap-2">
+        {seg("dia", "Por dia")}{seg("mes", "Mês atual")}{seg("meses", "Meses anteriores")}
+        <button onClick={() => exportCsv(orders, demo)} className="ml-auto rounded-full bg-card px-4 py-2 text-sm font-bold ring-1 ring-border">⬇ Exportar planilha (CSV)</button>
+      </div>
 
       {view === "dia" && (
         <>
@@ -90,6 +152,7 @@ export function AdminDashboard() {
             <Stat label="Itens (unidades)" value={String(day.units)} />
             <Stat label="Peso vendido" value={fmtKg(day.kg)} />
           </div>
+          <TopProducts list={dayOrders} />
           {dayOrders.length > 0 && (
             <div className="rounded-2xl bg-card p-4 shadow-card ring-1 ring-border">
               <h3 className="font-extrabold text-primary">Pedidos do dia</h3>
@@ -125,6 +188,7 @@ export function AdminDashboard() {
             </div>
             <div className="mt-1 flex justify-between text-xs text-muted-foreground"><span>Dia 1</span><span>Dia {daysSoFar}</span></div>
           </div>
+          <TopProducts list={monthOrders} />
         </>
       )}
 

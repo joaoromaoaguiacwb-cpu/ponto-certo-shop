@@ -63,6 +63,8 @@ export function useCart() {
   const count = lines.length > 0 ? lines.reduce((s, l) => s + Math.ceil(l.qty), 0) : 0;
   const subtotal = round2(lines.reduce((s, l) => s + l.lineTotal, 0));
   const hasSoldOut = lines.some((l) => l.soldOut);
+  const freeFrom = settings.freeDeliveryFrom;
+  const missingFree = freeFrom > 0 && subtotal < freeFrom ? round2(freeFrom - subtotal) : 0;
   const minOrder = settings.minOrder;
   const missingMin = minOrder > 0 && subtotal < minOrder ? round2(minOrder - subtotal) : 0;
 
@@ -90,7 +92,7 @@ export function useCart() {
 
   return {
     lines, count, subtotal, discount, total, coupon, couponCode: code, couponProblem, hasCoupons, earned, next,
-    hasSoldOut, minOrder, missingMin,
+    hasSoldOut, minOrder, missingMin, deliveryFee: settings.deliveryFee, freeFrom, missingFree,
     applyCoupon, removeCoupon, add, setQty, setNote, remove, clear,
   };
 }

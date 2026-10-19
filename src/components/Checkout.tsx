@@ -9,6 +9,8 @@ import { round2 } from "@/lib/money";
 import { useSettings } from "@/lib/settingsStore";
 import { addOrder } from "@/lib/ordersStore";
 import { PromoBox } from "./PromoBox";
+import { useStoreStatus } from "@/lib/hours";
+import { recordHistory } from "@/lib/historyStore";
 
 const PAYMENTS = ["Pix", "Cartão de crédito", "Cartão de débito", "Dinheiro"];
 type Form = { nome: string; telefone: string; rua: string; numero: string; bairro: string; cidade: string; complemento: string; pagamento: string; troco: string };
@@ -45,11 +47,14 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
   const delivery = !retirada;
   const hood = hoods.find((n) => n.name === f.bairro);
   const useHoodList = delivery && hoods.length > 0;
-  // taxa: null = "a combinar" (outro bairro) ou ainda sem bairro escolhido
-  const fee: number | null = !useHoodList ? 0 : outroBairro ? null : hood ? hood.fee : null;
-  const grand = round2(cart.total + (fee ?? 0));
-  const feePending = useHoodList && fee === null;
-  const closed = !settings.open;
+  // taxa: do bairro (se cadastrado), senão a taxa padrão; grátis a partir de R$ X (se configurado)
+  const baseFee = useHoodList && hood && !outroBairro ? hood.fee : settings.deliveryFee;
+  const freeFrom = settings.freeDeliveryFrom;
+  const freeDelivery = delivery && freeFrom > 0 && cart.subtotal >= freeFrom;
+  const fee = !delivery || freeDelivery ? 0 : baseFee;
+  const grand = round2(cart.total + fee);
+  const status = useStoreStatus();
+  const closed = !status.open;
   const hasRaffle = cart.earned.some((e) => e.reward.raffle);
 
   const clearSaved = () => {
@@ -76,7 +81,7 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
   };
 
   const submit = () => {
-    if (closed) { toast.error(settings.closedMessage); return; }
+    if (closed) { toast.error(status.message); return; }
     if (cart.hasSoldOut) { toast.error("Há produto esgotado no carrinho."); return; }
     if (cart.missingMin > 0) { toast.error(`Pedido mínimo de ${brl(cart.minOrder)}.`); return; }
     const e: typeof errors = {};
@@ -103,10 +108,10 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
       cart.coupon ? `\n🎟️ Cupom ${cart.coupon.code}: -${brl(cart.discount)} (subtotal ${brl(cart.subtotal)})` : "",
       cart.earned.length ? `\n🎁 *Você ganhou:* ${cart.earned.map(rewardLabel).join(", ")}` : "",
       hasRaffle ? "\n🍀 Os números dos cupons do sorteio serão enviados na confirmação do pedido." : "",
-      useHoodList ? (fee !== null ? `\n🚚 Taxa de entrega (${f.bairro.trim()}): ${brl(fee)}` : "\n🚚 Taxa de entrega: a combinar") : "",
+      delivery ? (fee > 0 ? `\n🚚 Taxa de entrega${hood && !outroBairro ? ` (${hood.name})` : ""}: ${brl(fee)}` : freeDelivery ? "\n🚚 Entrega grátis" : "\n🚚 Taxa de entrega: grátis") : "",
       cart.lines.some((l) => unitOf(l.product) === "kg") ? "\n⚖️ Itens por kg: o valor final pode variar conforme a pesagem." : "",
     ].join("");
-    const totalTxt = `${brl(grand)}${feePending ? " + taxa de entrega" : ""}`;
+    const totalTxt = brl(grand);
     const msg = `🛒 *NOVO PEDIDO - PONTO CERTO*\n\n👤 Cliente: ${f.nome.trim()}\n📞 Telefone: ${f.telefone.trim()}\n${local}\n💳 Pagamento (na hora da ${retirada ? "retirada" : "entrega"}): ${pagamento}\n\n*Produtos:*\n${produtos}${extras}\n\n💰 *TOTAL: ${totalTxt}*\n\nObrigado por comprar no Ponto Certo! Seu pedido será confirmado em instantes. ✅`;
     // guarda os dados do cliente neste aparelho para os próximos pedidos
     try {
@@ -116,9 +121,14 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
       };
       localStorage.setItem(SAVED_KEY, JSON.stringify(keep));
     } catch { /* sem espaço: segue sem salvar */ }
+    // guarda os itens pedidos neste aparelho (aparecem primeiro nas próximas visitas)
+    recordHistory(cart.lines.map((l) => ({ id: l.id, qty: l.qty, note: l.note })));
     // registra o pedido para o painel de vendas (falha aqui não impede o envio)
     const sum = (u: "kg" | "un") => cart.lines.filter((l) => unitOf(l.product) === u).reduce((s, l) => s + l.qty, 0);
-    void addOrder({ total: grand, units: sum("un"), kg: sum("kg"), coupon: cart.coupon?.code ?? null }).catch(() => {});
+    void addOrder({
+      total: grand, units: sum("un"), kg: sum("kg"), coupon: cart.coupon?.code ?? null,
+      lines: cart.lines.map((l) => ({ id: l.id, name: l.product.name, qty: l.qty, unit: unitOf(l.product), total: l.lineTotal })),
+    }).catch(() => {});
     window.open(`https://wa.me/${STORE_WHATSAPP}?text=${encodeURIComponent(msg)}`, "_blank");
     cart.clear();
     onDone();
@@ -147,7 +157,7 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
         <h2 className="text-lg font-extrabold">Finalizar compra</h2>
       </header>
       <div className="mx-auto max-w-xl space-y-6 p-4 pb-10">
-        {closed && <p className="rounded-2xl bg-accent px-4 py-3 text-sm font-bold text-accent-foreground">🔒 Loja fechada. {settings.closedMessage}</p>}
+        {closed && <p className="rounded-2xl bg-accent px-4 py-3 text-sm font-bold text-accent-foreground">🔒 Loja fechada. {status.message}</p>}
         <section className="space-y-3">
           <h3 className="font-extrabold text-primary">Seus dados</h3>
           {input("nome", "Nome completo *", { autoComplete: "name", maxLength: 100 })}
@@ -187,7 +197,7 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
                     className={`w-full rounded-xl border-2 bg-card px-4 py-3 outline-none focus:border-primary ${errors.bairro ? "border-accent" : "border-border"}`}>
                     <option value="">Escolha o bairro</option>
                     {hoods.map((n) => <option key={n.id} value={n.name}>{n.name} — {n.fee > 0 ? brl(n.fee) : "grátis"}</option>)}
-                    <option value="__outro">Outro bairro (taxa a combinar)</option>
+                    <option value="__outro">Outro bairro — {brl(settings.deliveryFee)}</option>
                   </select>
                   {errors.bairro && <span className="mt-1 block text-xs font-semibold text-accent">{errors.bairro}</span>}
                 </label>
@@ -235,7 +245,7 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
             ))}
           </ul>
           <div className="mt-3 border-t pt-3"><PromoBox cart={cart} hideEarned /></div>
-          {(cart.discount > 0 || useHoodList) && (
+          {(cart.discount > 0 || delivery) && (
             <div className="mt-3 space-y-0.5 border-t pt-3 text-sm text-muted-foreground">
               {cart.discount > 0 && (
                 <>
@@ -243,8 +253,14 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
                   <div className="flex justify-between"><span>Cupom {cart.coupon?.code}</span><span>-{brl(cart.discount)}</span></div>
                 </>
               )}
-              {useHoodList && (
-                <div className="flex justify-between"><span>Taxa de entrega</span><span>{fee !== null ? (fee > 0 ? brl(fee) : "Grátis") : outroBairro ? "A combinar" : "Escolha o bairro"}</span></div>
+              {delivery && (
+                <div className="flex justify-between">
+                  <span>Taxa de entrega</span>
+                  <span>{freeDelivery ? "Grátis" : useHoodList && !hood && !outroBairro ? "Escolha o bairro" : fee > 0 ? brl(fee) : "Grátis"}</span>
+                </div>
+              )}
+              {delivery && freeFrom > 0 && !freeDelivery && (
+                <p className="text-xs">🚚 Faltam <b>{brl(round2(freeFrom - cart.subtotal))}</b> em compras para a entrega ser grátis.</p>
               )}
             </div>
           )}
@@ -254,7 +270,7 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
               {hasRaffle && <p className="mt-1 text-xs font-normal text-muted-foreground">Os números dos cupons do sorteio são enviados na confirmação do pedido.</p>}
             </div>
           )}
-          <div className="mt-3 flex justify-between border-t pt-3 text-lg font-extrabold"><span>Total</span><span className="text-primary">{brl(grand)}{feePending && outroBairro ? " + taxa" : ""}</span></div>
+          <div className="mt-3 flex justify-between border-t pt-3 text-lg font-extrabold"><span>Total</span><span className="text-primary">{brl(grand)}</span></div>
           {cart.lines.some((l) => unitOf(l.product) === "kg") && <p className="mt-2 text-xs text-muted-foreground">⚖️ Itens por kg: o valor final pode variar conforme a pesagem.</p>}
         </section>
         <button onClick={submit} disabled={closed} className="w-full rounded-full bg-whatsapp py-4 text-lg font-extrabold text-primary-foreground shadow-card active:scale-[.98] disabled:opacity-50">

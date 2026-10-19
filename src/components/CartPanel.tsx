@@ -70,6 +70,10 @@ export function CartPanel({ cart, onClose, onCheckout }: { cart: Cart; onClose: 
                 <span className="font-semibold">Total</span>
                 <span className="text-2xl font-extrabold text-primary">{brl(cart.total)}</span>
               </div>
+              <p className="text-xs text-muted-foreground">
+                🚚 Entrega {cart.deliveryFee > 0 ? brl(cart.deliveryFee) : "grátis"}
+                {cart.freeFrom > 0 && (cart.missingFree > 0 ? <> · faltam <b>{brl(cart.missingFree)}</b> para entrega grátis</> : <> · <b>entrega grátis!</b></>)}
+              </p>
               {cart.missingMin > 0 && (
                 <p className="rounded-xl bg-muted px-3 py-2 text-sm font-semibold">
                   Pedido mínimo de {brl(cart.minOrder)}: faltam <b>{brl(cart.missingMin)}</b>.

@@ -1,10 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { Search, ShoppingCart } from "lucide-react";
+import { toast } from "sonner";
 import { CATEGORIES } from "@/data/products";
 import { useProducts } from "@/lib/productsStore";
 import { isAdminSession } from "@/lib/admin";
 import { useSettings } from "@/lib/settingsStore";
+import { scheduleSummary, useStoreStatus } from "@/lib/hours";
+import { useHistory } from "@/lib/historyStore";
 import { useCart } from "@/lib/cart";
 import { ProductCard } from "@/components/ProductCard";
 import { CartPanel } from "@/components/CartPanel";
@@ -25,12 +28,13 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const rank = (p: { onSale?: boolean | undefined; soldOut?: boolean | undefined }) => (p.soldOut ? 2 : p.onSale ? 0 : 1);
 const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 function Index() {
   const products = useProducts();
   const settings = useSettings();
+  const status = useStoreStatus();
+  const history = useHistory();
   const cart = useCart();
   const [admin, setAdmin] = useState<"off" | "login" | "panel">("off");
   const clicks = useRef<number[]>([]);
@@ -38,15 +42,30 @@ function Index() {
   const [cat, setCat] = useState("todos");
   const [view, setView] = useState<"shop" | "cart" | "checkout" | "success">("shop");
 
-  // Promoções primeiro (dentro da categoria e em "Todos"); o resto mantém a ordem original.
-  const list = useMemo(
-    () =>
-      products
-        .filter((p) => (cat === "todos" || p.category === cat) && norm(p.name).includes(norm(q)))
-        // promoções primeiro, esgotados por último
-        .sort((a, b) => rank(a) - rank(b)),
-    [products, q, cat],
-  );
+  // Ordem: 1º o que o cliente já pediu (mais recente primeiro), 2º promoções, 3º o resto; esgotados por último.
+  const boughtRank = useMemo(() => new Map(history.bought.map((id, i) => [id, i] as const)), [history.bought]);
+  const list = useMemo(() => {
+    const rank = (p: { id: number; onSale?: boolean | undefined; soldOut?: boolean | undefined }) =>
+      p.soldOut ? 3 : boughtRank.has(p.id) ? 0 : p.onSale ? 1 : 2;
+    return products
+      .filter((p) => (cat === "todos" || p.category === cat) && norm(p.name).includes(norm(q)))
+      .sort((a, b) => rank(a) - rank(b) || (boughtRank.get(a.id) ?? 0) - (boughtRank.get(b.id) ?? 0));
+  }, [products, q, cat, boughtRank]);
+
+  // Repete o último pedido: coloca no carrinho o que ainda está disponível.
+  const repeatLast = () => {
+    let added = 0;
+    for (const it of history.last) {
+      const p = products.find((x) => x.id === it.id);
+      if (!p || p.soldOut) continue;
+      cart.add(p.id, it.qty, it.note);
+      added++;
+    }
+    const skipped = history.last.length - added;
+    if (added === 0) { toast.error("Os produtos do último pedido não estão disponíveis."); return; }
+    toast.success(`${added} produto(s) do último pedido no carrinho${skipped > 0 ? ` (${skipped} indisponível)` : ""}`);
+    setView("cart");
+  };
 
   // 3 cliques rápidos no logo abrem o acesso administrativo
   const onLogoClick = () => {
@@ -72,10 +91,10 @@ function Index() {
         <div className="h-1 bg-brand-stripe" />
       </header>
 
-      {!settings.open && (
-        <div className="bg-accent px-4 py-2 text-center text-sm font-bold text-accent-foreground">🔒 Loja fechada. {settings.closedMessage}</div>
+      {!status.open && (
+        <div className="bg-accent px-4 py-2 text-center text-sm font-bold text-accent-foreground">🔒 Loja fechada. {status.message}</div>
       )}
-      {settings.open && settings.bannerEnabled && settings.bannerText.trim() && (
+      {status.open && settings.bannerEnabled && settings.bannerText.trim() && (
         <div className="bg-secondary px-4 py-2 text-center text-sm font-bold text-secondary-foreground">📢 {settings.bannerText}</div>
       )}
 
@@ -91,15 +110,24 @@ function Index() {
           {CATEGORIES.map((c) => chip(c.id, `${c.emoji} ${c.name}`))}
         </div>
 
+        {history.last.length > 0 && (
+          <button onClick={repeatLast}
+            className="mt-4 w-full rounded-full border-2 border-primary bg-card px-4 py-3 text-sm font-extrabold text-primary active:scale-[.98]">
+            🔁 Repetir meu último pedido
+          </button>
+        )}
+
         <p className="mt-4 text-sm text-muted-foreground">{list.length} produtos</p>
         {list.length === 0 ? (
           <div className="py-16 text-center"><div className="text-5xl">🔍</div><p className="mt-2 font-semibold">Nenhum produto encontrado</p></div>
         ) : (
           <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-            {list.map((p) => <ProductCard key={p.id} product={p} onAdd={cart.add} />)}
+            {list.map((p) => <ProductCard key={p.id} product={p} onAdd={cart.add} bought={boughtRank.has(p.id)} />)}
           </div>
         )}
       </div>
+
+      <p className="mx-auto mt-8 max-w-7xl px-4 text-center text-xs text-muted-foreground">🕒 Horário de atendimento: {scheduleSummary(settings)}</p>
 
       <button aria-label="Abrir carrinho" onClick={() => setView("cart")}
         className="fixed bottom-5 left-5 z-40 grid h-16 w-16 place-items-center rounded-full bg-primary text-primary-foreground shadow-float transition active:scale-95">
