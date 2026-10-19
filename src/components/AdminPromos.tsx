@@ -53,7 +53,7 @@ function CouponForm({ coupon, all, onClose }: { coupon: Coupon | null; all: Coup
   const [active, setActive] = useState(coupon?.active ?? true);
   const [busy, setBusy] = useState(false);
 
-  const save = async () => {
+  const save = async (): Promise<unknown> => {
     const c = normCode(code);
     const v = parseMoney(value);
     const min = minTotal.trim() ? parseMoney(minTotal) : 0;
@@ -142,7 +142,7 @@ function RewardForm({ reward, onClose }: { reward: Reward | null; onClose: () =>
   const [raffle, setRaffle] = useState(reward?.raffle ?? false);
   const [busy, setBusy] = useState(false);
 
-  const save = async () => {
+  const save = async (): Promise<unknown> => {
     const n = name.trim();
     const amount = parseMoney(every);
     if (!n) return toast.error("Informe o prêmio");

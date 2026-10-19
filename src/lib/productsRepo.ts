@@ -86,7 +86,7 @@ export async function adjustPrices(category: string, percent: number): Promise<{
     return {
       ...p,
       price: Math.max(0.01, round2(p.price * factor)),
-      wholesale: p.wholesale ? { ...p.wholesale, price: Math.max(0.01, round2(p.wholesale.price * factor)) } : p.wholesale,
+      wholesale: p.wholesale ? { ...p.wholesale, price: Math.max(0.01, round2(p.wholesale.price * factor)) } : null,
     };
   });
   await write(next);
@@ -98,7 +98,7 @@ export async function restorePrices(before: PriceSnapshot): Promise<void> {
   await write(
     list.map((p) => {
       const b = before[p.id];
-      return b ? { ...p, price: b.price, wholesale: b.wholesale } : p;
+      return b ? { ...p, price: b.price, wholesale: b.wholesale ?? null } : p;
     }),
   );
 }

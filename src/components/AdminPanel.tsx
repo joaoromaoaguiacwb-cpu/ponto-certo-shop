@@ -197,7 +197,7 @@ function ProductForm({ product, onClose }: { product: Product | null; onClose: (
     }
   };
 
-  const save = async () => {
+  const save = async (): Promise<unknown> => {
     const name = f.name.trim();
     const price = parseMoney(f.price);
     if (!name) return toast.error("Informe o nome do produto");
@@ -320,7 +320,7 @@ function BulkPriceModal({ onClose }: { onClose: () => void }) {
   const sample = scope[0];
   const after = (v: number) => Math.max(0.01, Math.round(v * (1 + percent / 100) * 100) / 100);
 
-  const apply = async () => {
+  const apply = async (): Promise<unknown> => {
     if (!valid) return toast.error("Informe uma porcentagem válida");
     if (scope.length === 0) return toast.error("Nenhum produto nessa categoria");
     setBusy(true);

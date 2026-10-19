@@ -95,7 +95,7 @@ function SettingsForm({ s }: { s: Settings }) {
 
   const setDay = (i: number, patch: Partial<DaySchedule>) => setSchedule((sc) => sc.map((d, j) => (j === i ? { ...d, ...patch } : d)));
 
-  const save = async () => {
+  const save = async (): Promise<unknown> => {
     const min = minOrder.trim() ? parseMoney(minOrder) : 0;
     const fee = deliveryFee.trim() ? parseMoney(deliveryFee) : 0;
     const free = freeFrom.trim() ? parseMoney(freeFrom) : 0;
@@ -197,7 +197,7 @@ function HoodForm({ hood, all, onClose }: { hood: Neighborhood | null; all: Neig
   const [active, setActive] = useState(hood?.active ?? true);
   const [busy, setBusy] = useState(false);
 
-  const save = async () => {
+  const save = async (): Promise<unknown> => {
     const n = name.trim();
     const f = fee.trim() ? parseMoney(fee) : 0;
     if (!n) return toast.error("Informe o nome do bairro");
