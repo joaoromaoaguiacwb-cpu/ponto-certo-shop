@@ -12,6 +12,7 @@ import { useCart } from "@/lib/cart";
 import { ProductCard } from "@/components/ProductCard";
 import { CartPanel } from "@/components/CartPanel";
 import { Checkout } from "@/components/Checkout";
+import { InstallApp } from "@/components/InstallApp";
 import { AdminLogin } from "@/components/AdminLogin";
 import { AdminPanel } from "@/components/AdminPanel";
 import logo from "@/assets/logo.png.asset.json";
@@ -126,6 +127,8 @@ function Index() {
           </div>
         )}
       </div>
+
+      <InstallApp />
 
       <p className="mx-auto mt-8 max-w-7xl px-4 text-center text-xs text-muted-foreground">🕒 Horário de atendimento: {scheduleSummary(settings)}</p>
 

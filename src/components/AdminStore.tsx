@@ -122,6 +122,11 @@ function SettingsForm({ s }: { s: Settings }) {
     <section className={card}>
       <h2 className="font-extrabold text-primary">Avisos e regras do pedido</h2>
 
+      <a href="/qr" target="_blank" rel="noreferrer"
+        className="mt-3 block rounded-full border-2 border-primary px-4 py-2 text-center text-sm font-extrabold text-primary">
+        🔳 QR code da loja (imprimir)
+      </a>
+
       <label className="mt-3 block text-xs font-bold">Aviso quando a loja está fechada (manual)</label>
       <input value={closedMessage} onChange={(e) => setClosedMessage(e.target.value)} maxLength={140}
         placeholder="Ex: Estamos fechados. Atendemos de seg a sáb, das 7h às 19h." className={field} />
