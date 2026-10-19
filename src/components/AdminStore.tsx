@@ -99,13 +99,13 @@ function SettingsForm({ s }: { s: Settings }) {
     const min = minOrder.trim() ? parseMoney(minOrder) : 0;
     const fee = deliveryFee.trim() ? parseMoney(deliveryFee) : 0;
     const free = freeFrom.trim() ? parseMoney(freeFrom) : 0;
-    if (!Number.isFinite(fee) || fee < 0) return toast.error("Taxa de entrega inválida");
-    if (!Number.isFinite(free) || free < 0) return toast.error("Valor da entrega grátis inválido");
+    if (!Number.isFinite(fee) || fee < 0) return void toast.error("Taxa de entrega inválida");
+    if (!Number.isFinite(free) || free < 0) return void toast.error("Valor da entrega grátis inválido");
     for (const [i, d] of schedule.entries()) {
-      if (d.enabled && (!d.open || !d.close || d.close <= d.open)) return toast.error(`${DAY_NAMES[i]}: o horário de fechar precisa ser depois do de abrir`);
+      if (d.enabled && (!d.open || !d.close || d.close <= d.open)) return void toast.error(`${DAY_NAMES[i]}: o horário de fechar precisa ser depois do de abrir`);
     }
-    if (!Number.isFinite(min) || min < 0) return toast.error("Pedido mínimo inválido");
-    if (bannerEnabled && !bannerText.trim()) return toast.error("Escreva o texto do banner ou desmarque a opção");
+    if (!Number.isFinite(min) || min < 0) return void toast.error("Pedido mínimo inválido");
+    if (bannerEnabled && !bannerText.trim()) return void toast.error("Escreva o texto do banner ou desmarque a opção");
     setBusy(true);
     try {
       await saveSettings({
@@ -200,9 +200,9 @@ function HoodForm({ hood, all, onClose }: { hood: Neighborhood | null; all: Neig
   const save = async () => {
     const n = name.trim();
     const f = fee.trim() ? parseMoney(fee) : 0;
-    if (!n) return toast.error("Informe o nome do bairro");
-    if (all.some((x) => x.id !== hood?.id && x.name.toLowerCase() === n.toLowerCase())) return toast.error("Esse bairro já existe");
-    if (!Number.isFinite(f) || f < 0) return toast.error("Taxa inválida");
+    if (!n) return void toast.error("Informe o nome do bairro");
+    if (all.some((x) => x.id !== hood?.id && x.name.toLowerCase() === n.toLowerCase())) return void toast.error("Esse bairro já existe");
+    if (!Number.isFinite(f) || f < 0) return void toast.error("Taxa inválida");
     setBusy(true);
     try {
       const data = { name: n, fee: round2(f), active };

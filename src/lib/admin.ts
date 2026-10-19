@@ -1,24 +1,30 @@
-// ⚠️ VERSÃO DE DEMONSTRAÇÃO: a senha é conferida aqui no navegador e fica visível no código do site.
-// Na versão final (Lovable Cloud), a conferência deve ir para uma função de servidor, com a senha guardada como secret.
-export const ADMIN_PASSWORD = "atacado321";
+// Login do painel: a senha é conferida no servidor (Lovable Cloud, secret ADMIN_PASSWORD).
+// Aqui só guardamos o "passe" da sessão, que expira em 2 horas.
+import { adminLogin } from "./store.functions";
 
-const KEY = "ponto-certo-admin";
-const DURATION_MS = 2 * 60 * 60 * 1000; // sessão expira em 2 horas
+const KEY = "ponto-certo-admin-token";
 
-export function isAdminSession(): boolean {
+export function getAdminToken(): string | null {
   try {
-    return Number(sessionStorage.getItem(KEY)) > Date.now();
+    const t = sessionStorage.getItem(KEY);
+    if (!t || Number(t.split(".")[0]) <= Date.now()) return null;
+    return t;
   } catch {
-    return false;
+    return null;
   }
 }
 
-export function loginAdmin(password: string): boolean {
-  if (password !== ADMIN_PASSWORD) return false;
+export function isAdminSession(): boolean {
+  return getAdminToken() !== null;
+}
+
+export async function loginAdmin(password: string): Promise<boolean> {
+  const { token } = await adminLogin({ data: { password } });
+  if (!token) return false;
   try {
-    sessionStorage.setItem(KEY, String(Date.now() + DURATION_MS));
+    sessionStorage.setItem(KEY, token);
   } catch {
-    /* sem sessionStorage: o painel abre, mas não lembra a sessão */
+    /* nada */
   }
   return true;
 }

@@ -1,5 +1,6 @@
+import { readStore, writeStore } from "./cloud";
 // Configurações da loja (aberta/fechada, banner, pedido mínimo, retirada, taxa por bairro).
-// Nesta demo ficam no localStorage deste navegador. Para ligar o Lovable Cloud, troque o corpo destas
+// Ficam salvos no Lovable Cloud (iguais para todos os clientes). Para ligar o Lovable Cloud, troque o corpo destas
 // funções por chamadas ao banco; o resto do site não muda.
 
 export type DaySchedule = { enabled: boolean; open: string; close: string }; // "07:00" / "20:00"
@@ -52,11 +53,10 @@ export const EXAMPLE_SETTINGS: Settings = {
 
 const KEY = "ponto-certo-settings-v1";
 
-function read(): Settings {
+async function read(): Promise<Settings> {
   try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return EXAMPLE_SETTINGS;
-    const d = JSON.parse(raw);
+    const d = await readStore<Partial<Settings>>("settings");
+    if (!d) return EXAMPLE_SETTINGS;
     return {
       ...DEFAULT_SETTINGS,
       ...d,
@@ -64,31 +64,31 @@ function read(): Settings {
       schedule: Array.isArray(d?.schedule) && d.schedule.length === 7 ? d.schedule : DEFAULT_SCHEDULE,
     };
   } catch {
-    return DEFAULT_SETTINGS;
+    return EXAMPLE_SETTINGS;
   }
 }
 
-// Lança erro se não couber (localStorage cheio); quem chama mostra o aviso.
-function write(s: Settings) {
-  localStorage.setItem(KEY, JSON.stringify(s));
+// Lança erro se não salvar (ex.: sessão do painel expirada); quem chama mostra o aviso.
+async function write(s: Settings) {
+  await writeStore("settings", s);
 }
 
 export async function getSettings(): Promise<Settings> {
-  return read();
+  return (await read());
 }
 export async function updateSettings(patch: SettingsPatch): Promise<void> {
-  write({ ...read(), ...patch });
+  await write({ ...(await read()), ...patch });
 }
 export async function createNeighborhood(input: NeighborhoodInput): Promise<void> {
-  const s = read();
+  const s = (await read());
   const id = s.neighborhoods.reduce((m, n) => Math.max(m, n.id), 0) + 1;
-  write({ ...s, neighborhoods: [...s.neighborhoods, { id, ...input }] });
+  await write({ ...s, neighborhoods: [...s.neighborhoods, { id, ...input }] });
 }
 export async function updateNeighborhood(id: number, patch: Partial<NeighborhoodInput>): Promise<void> {
-  const s = read();
-  write({ ...s, neighborhoods: s.neighborhoods.map((n) => (n.id === id ? { ...n, ...patch } : n)) });
+  const s = (await read());
+  await write({ ...s, neighborhoods: s.neighborhoods.map((n) => (n.id === id ? { ...n, ...patch } : n)) });
 }
 export async function deleteNeighborhood(id: number): Promise<void> {
-  const s = read();
-  write({ ...s, neighborhoods: s.neighborhoods.filter((n) => n.id !== id) });
+  const s = (await read());
+  await write({ ...s, neighborhoods: s.neighborhoods.filter((n) => n.id !== id) });
 }

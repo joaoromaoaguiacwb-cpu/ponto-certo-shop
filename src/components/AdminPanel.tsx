@@ -200,15 +200,15 @@ function ProductForm({ product, onClose }: { product: Product | null; onClose: (
   const save = async () => {
     const name = f.name.trim();
     const price = parseMoney(f.price);
-    if (!name) return toast.error("Informe o nome do produto");
-    if (!Number.isFinite(price) || price <= 0) return toast.error("Informe um preço válido");
+    if (!name) return void toast.error("Informe o nome do produto");
+    if (!Number.isFinite(price) || price <= 0) return void toast.error("Informe um preço válido");
     let wholesale: { minQty: number; price: number } | null = null;
     if (f.wMin.trim() || f.wPrice.trim()) {
       const minQty = parseMoney(f.wMin);
       const wPrice = parseMoney(f.wPrice);
       if (!Number.isFinite(minQty) || minQty <= 0 || !Number.isFinite(wPrice) || wPrice <= 0)
-        return toast.error("Preencha a quantidade e o preço de atacado (ou deixe os dois vazios)");
-      if (wPrice >= price) return toast.error("O preço de atacado deve ser menor que o preço normal");
+        return void toast.error("Preencha a quantidade e o preço de atacado (ou deixe os dois vazios)");
+      if (wPrice >= price) return void toast.error("O preço de atacado deve ser menor que o preço normal");
       wholesale = { minQty, price: Math.round(wPrice * 100) / 100 };
     }
     setBusy(true);
@@ -321,8 +321,8 @@ function BulkPriceModal({ onClose }: { onClose: () => void }) {
   const after = (v: number) => Math.max(0.01, Math.round(v * (1 + percent / 100) * 100) / 100);
 
   const apply = async () => {
-    if (!valid) return toast.error("Informe uma porcentagem válida");
-    if (scope.length === 0) return toast.error("Nenhum produto nessa categoria");
+    if (!valid) return void toast.error("Informe uma porcentagem válida");
+    if (scope.length === 0) return void toast.error("Nenhum produto nessa categoria");
     setBusy(true);
     try {
       const { count, before } = await adjustPrices(category, percent);
