@@ -43,7 +43,7 @@ export async function reloadOrders() {
 export function useOrders(): repo.Order[] {
   const list = useSyncExternalStore(subscribe, () => state, () => EMPTY);
   useEffect(() => {
-    void loadOrders();
+    void reloadOrders().catch(() => {});
   }, []);
   return list;
 }
