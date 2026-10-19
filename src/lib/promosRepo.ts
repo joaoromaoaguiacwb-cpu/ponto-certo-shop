@@ -1,5 +1,5 @@
 import { readStore, writeStore } from "./cloud";
-// Cupons e prêmios. Nesta demo ficam no localStorage deste navegador.
+// Cupons e prêmios. Ficam salvos no Lovable Cloud (iguais para todos os clientes).
 // Para ligar o Lovable Cloud, troque o corpo destas funções por chamadas ao banco; o resto do site não muda.
 
 export type Coupon = {
@@ -47,7 +47,7 @@ async function read(): Promise<Promos> {
   };
 }
 
-// Lança erro se não couber (localStorage cheio); quem chama mostra o aviso.
+// Lança erro se não salvar (ex.: sessão do painel expirada); quem chama mostra o aviso.
 async function write(d: Promos) {
   await writeStore("promos", d);
 }

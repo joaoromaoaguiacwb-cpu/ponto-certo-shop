@@ -11,8 +11,14 @@ export function AdminLogin({ onSuccess, onClose }: { onSuccess: () => void; onCl
     ref.current?.focus();
   }, []);
 
-  const submit = () => {
-    if (loginAdmin(pw)) onSuccess();
+  const submit = async () => {
+    let ok = false;
+    try {
+      ok = await loginAdmin(pw);
+    } catch {
+      ok = false;
+    }
+    if (ok) onSuccess();
     else {
       setError(true);
       setPw("");

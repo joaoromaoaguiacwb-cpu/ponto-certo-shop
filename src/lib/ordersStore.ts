@@ -22,11 +22,21 @@ const subscribe = (f: () => void) => {
 export async function loadOrders() {
   if (loaded) return;
   loaded = true;
-  set(await repo.listOrders());
+  try {
+    set(await repo.listOrders());
+  } catch {
+    loaded = false;
+  }
 }
 
 export async function addOrder(input: repo.OrderInput) {
   await repo.createOrder(input);
+  if (loaded) set(await repo.listOrders());
+}
+
+// Recarrega (ex.: logo depois de entrar no painel)
+export async function reloadOrders() {
+  loaded = true;
   set(await repo.listOrders());
 }
 

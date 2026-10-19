@@ -1,5 +1,5 @@
 import { readStore, writeStore } from "./cloud";
-// ÚNICA camada de acesso aos produtos. Nesta demo os dados ficam no localStorage deste navegador.
+// ÚNICA camada de acesso aos produtos. Os dados ficam salvos no Lovable Cloud.
 // Para ligar o Lovable Cloud, troque o corpo destas funções por chamadas ao banco; o resto do site não muda.
 import { PRODUCTS as SEED, type Product } from "@/data/products";
 
@@ -36,7 +36,7 @@ async function read(): Promise<Product[] | null> {
   return Array.isArray(d) ? d : null;
 }
 
-// Lança erro se não couber (localStorage cheio); quem chama mostra o aviso.
+// Lança erro se não salvar (ex.: sessão do painel expirada); quem chama mostra o aviso.
 async function write(list: Product[]) {
   await writeStore("products", list);
 }

@@ -1,6 +1,6 @@
 import { readStore, writeStore } from "./cloud";
 // Configurações da loja (aberta/fechada, banner, pedido mínimo, retirada, taxa por bairro).
-// Nesta demo ficam no localStorage deste navegador. Para ligar o Lovable Cloud, troque o corpo destas
+// Ficam salvos no Lovable Cloud (iguais para todos os clientes). Para ligar o Lovable Cloud, troque o corpo destas
 // funções por chamadas ao banco; o resto do site não muda.
 
 export type DaySchedule = { enabled: boolean; open: string; close: string }; // "07:00" / "20:00"
@@ -68,7 +68,7 @@ async function read(): Promise<Settings> {
   }
 }
 
-// Lança erro se não couber (localStorage cheio); quem chama mostra o aviso.
+// Lança erro se não salvar (ex.: sessão do painel expirada); quem chama mostra o aviso.
 async function write(s: Settings) {
   await writeStore("settings", s);
 }
@@ -77,7 +77,7 @@ export async function getSettings(): Promise<Settings> {
   return (await read());
 }
 export async function updateSettings(patch: SettingsPatch): Promise<void> {
-  await write({ ...read(), ...patch });
+  await write({ ...(await read()), ...patch });
 }
 export async function createNeighborhood(input: NeighborhoodInput): Promise<void> {
   const s = (await read());

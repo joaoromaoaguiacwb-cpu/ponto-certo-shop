@@ -1,6 +1,5 @@
 // Registro dos pedidos ENVIADOS pelo site (para o painel de vendas).
-// Nesta demo ficam no localStorage deste navegador; só aparecem pedidos feitos aqui.
-// Para ligar o Lovable Cloud, troque o corpo destas funções por chamadas ao banco (tabela "orders").
+// Ficam salvos no Lovable Cloud (tabela "orders"): aparecem pedidos de todos os clientes.
 
 export type OrderLine = { id: number; name: string; qty: number; unit: "kg" | "un"; total: number };
 export type Order = {
@@ -14,28 +13,18 @@ export type Order = {
 };
 export type OrderInput = Omit<Order, "id" | "at">;
 
-const KEY = "ponto-certo-orders-v1";
-const MAX = 10000;
+import { fetchOrders, submitOrder } from "./store.functions";
+import { getAdminToken } from "./admin";
 
-function read(): Order[] {
-  try {
-    const raw = localStorage.getItem(KEY);
-    const d = raw ? JSON.parse(raw) : [];
-    return Array.isArray(d) ? (d as Order[]) : [];
-  } catch {
-    return [];
-  }
-}
-
+// Só o painel (com a senha) consegue ler os pedidos.
 export async function listOrders(): Promise<Order[]> {
-  return read();
+  const token = getAdminToken();
+  if (!token) return [];
+  return fetchOrders({ data: { token } });
 }
 
 export async function createOrder(input: OrderInput): Promise<void> {
-  const list = read();
-  const id = list.reduce((m, o) => Math.max(m, o.id), 0) + 1;
-  const next = [...list, { id, at: Date.now(), ...input }];
-  localStorage.setItem(KEY, JSON.stringify(next.slice(-MAX)));
+  await submitOrder({ data: input });
 }
 
 import { PRODUCTS } from "@/data/products";
