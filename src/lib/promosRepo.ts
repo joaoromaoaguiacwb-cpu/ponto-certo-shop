@@ -1,3 +1,4 @@
+import { readStore, writeStore } from "./cloud";
 // Cupons e prêmios. Nesta demo ficam no localStorage deste navegador.
 // Para ligar o Lovable Cloud, troque o corpo destas funções por chamadas ao banco; o resto do site não muda.
 
@@ -37,56 +38,51 @@ const EXAMPLE_REWARDS: Reward[] = [
 
 export const normCode = (s: string) => s.trim().toUpperCase().replace(/\s+/g, "");
 
-function read(): Promos {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return { coupons: [...EXAMPLE_COUPONS], rewards: [...EXAMPLE_REWARDS] };
-    const d = JSON.parse(raw);
-    return {
-      coupons: Array.isArray(d?.coupons) ? d.coupons : [],
-      rewards: Array.isArray(d?.rewards) ? d.rewards : [],
-    };
-  } catch {
-    return { coupons: [], rewards: [] };
-  }
+async function read(): Promise<Promos> {
+  const d = await readStore<Promos>("promos");
+  if (!d) return { coupons: [...EXAMPLE_COUPONS], rewards: [...EXAMPLE_REWARDS] };
+  return {
+    coupons: Array.isArray(d?.coupons) ? d.coupons : [],
+    rewards: Array.isArray(d?.rewards) ? d.rewards : [],
+  };
 }
 
 // Lança erro se não couber (localStorage cheio); quem chama mostra o aviso.
-function write(d: Promos) {
-  localStorage.setItem(KEY, JSON.stringify(d));
+async function write(d: Promos) {
+  await writeStore("promos", d);
 }
 
 const nextId = (list: { id: number }[]) => list.reduce((m, x) => Math.max(m, x.id), 0) + 1;
 
 export async function listPromos(): Promise<Promos> {
-  return read();
+  return (await read());
 }
 
 export async function createCoupon(input: CouponInput): Promise<void> {
-  const d = read();
-  write({ ...d, coupons: [...d.coupons, { id: nextId(d.coupons), ...input, code: normCode(input.code) }] });
+  const d = (await read());
+  await write({ ...d, coupons: [...d.coupons, { id: nextId(d.coupons), ...input, code: normCode(input.code) }] });
 }
 export async function updateCoupon(id: number, patch: Partial<CouponInput>): Promise<void> {
-  const d = read();
-  write({
+  const d = (await read());
+  await write({
     ...d,
     coupons: d.coupons.map((c) => (c.id === id ? { ...c, ...patch, code: normCode(patch.code ?? c.code) } : c)),
   });
 }
 export async function deleteCoupon(id: number): Promise<void> {
-  const d = read();
-  write({ ...d, coupons: d.coupons.filter((c) => c.id !== id) });
+  const d = (await read());
+  await write({ ...d, coupons: d.coupons.filter((c) => c.id !== id) });
 }
 
 export async function createReward(input: RewardInput): Promise<void> {
-  const d = read();
-  write({ ...d, rewards: [...d.rewards, { id: nextId(d.rewards), ...input }] });
+  const d = (await read());
+  await write({ ...d, rewards: [...d.rewards, { id: nextId(d.rewards), ...input }] });
 }
 export async function updateReward(id: number, patch: Partial<RewardInput>): Promise<void> {
-  const d = read();
-  write({ ...d, rewards: d.rewards.map((r) => (r.id === id ? { ...r, ...patch } : r)) });
+  const d = (await read());
+  await write({ ...d, rewards: d.rewards.map((r) => (r.id === id ? { ...r, ...patch } : r)) });
 }
 export async function deleteReward(id: number): Promise<void> {
-  const d = read();
-  write({ ...d, rewards: d.rewards.filter((r) => r.id !== id) });
+  const d = (await read());
+  await write({ ...d, rewards: d.rewards.filter((r) => r.id !== id) });
 }

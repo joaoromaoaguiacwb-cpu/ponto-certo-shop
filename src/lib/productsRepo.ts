@@ -1,3 +1,4 @@
+import { readStore, writeStore } from "./cloud";
 // ÚNICA camada de acesso aos produtos. Nesta demo os dados ficam no localStorage deste navegador.
 // Para ligar o Lovable Cloud, troque o corpo destas funções por chamadas ao banco; o resto do site não muda.
 import { PRODUCTS as SEED, type Product } from "@/data/products";
@@ -30,37 +31,31 @@ const EXAMPLE_WHOLESALE: Record<number, { minQty: number; price: number }> = {
 const seed = (): Product[] =>
   SEED.map((p) => ({ ...p, onSale: EXAMPLE_SALE.has(p.id), wholesale: EXAMPLE_WHOLESALE[p.id] ?? null }));
 
-function read(): Product[] | null {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    return Array.isArray(data) ? (data as Product[]) : null;
-  } catch {
-    return null;
-  }
+async function read(): Promise<Product[] | null> {
+  const d = await readStore<Product[]>("products");
+  return Array.isArray(d) ? d : null;
 }
 
 // Lança erro se não couber (localStorage cheio); quem chama mostra o aviso.
-function write(list: Product[]) {
-  localStorage.setItem(KEY, JSON.stringify(list));
+async function write(list: Product[]) {
+  await writeStore("products", list);
 }
 
 export async function listProducts(): Promise<Product[]> {
-  return read() ?? seed();
+  return (await read()) ?? seed();
 }
 
 export async function createProduct(input: ProductInput): Promise<Product> {
-  const list = read() ?? seed();
+  const list = (await read()) ?? seed();
   const id = list.reduce((m, p) => Math.max(m, p.id), 0) + 1;
   const product: Product = { id, ...input, fallback: "" };
-  write([...list, product]);
+  await write([...list, product]);
   return product;
 }
 
 export async function updateProduct(id: number, patch: Partial<ProductInput>): Promise<void> {
-  const list = read() ?? seed();
-  write(
+  const list = (await read()) ?? seed();
+  await write(
     list.map((p) => {
       if (p.id !== id) return p;
       const next = { ...p, ...patch };
@@ -72,21 +67,17 @@ export async function updateProduct(id: number, patch: Partial<ProductInput>): P
 }
 
 export async function deleteProduct(id: number): Promise<void> {
-  const list = read() ?? seed();
-  write(list.filter((p) => p.id !== id));
+  const list = (await read()) ?? seed();
+  await write(list.filter((p) => p.id !== id));
 }
 
 export async function resetProducts(): Promise<void> {
-  try {
-    localStorage.removeItem(KEY);
-  } catch {
-    /* nada */
-  }
+  await writeStore("products", null);
 }
 
 // Reajusta preços (e o preço de atacado) de uma categoria ou de todos. Retorna o estado anterior para desfazer.
 export async function adjustPrices(category: string, percent: number): Promise<{ count: number; before: PriceSnapshot }> {
-  const list = read() ?? seed();
+  const list = (await read()) ?? seed();
   const before: PriceSnapshot = {};
   const factor = 1 + percent / 100;
   const next = list.map((p) => {
@@ -98,13 +89,13 @@ export async function adjustPrices(category: string, percent: number): Promise<{
       wholesale: p.wholesale ? { ...p.wholesale, price: Math.max(0.01, round2(p.wholesale.price * factor)) } : p.wholesale,
     };
   });
-  write(next);
+  await write(next);
   return { count: Object.keys(before).length, before };
 }
 
 export async function restorePrices(before: PriceSnapshot): Promise<void> {
-  const list = read() ?? seed();
-  write(
+  const list = (await read()) ?? seed();
+  await write(
     list.map((p) => {
       const b = before[p.id];
       return b ? { ...p, price: b.price, wholesale: b.wholesale } : p;
