@@ -15,6 +15,7 @@ export type Reward = {
   everyAmount: number; // a cada R$ X em compras
   repeat: boolean; // true = ganha de novo a cada R$ X (acumula); false = ganha 1 vez ao atingir R$ X
   active: boolean;
+  raffle?: boolean | undefined; // true = cupom de sorteio (a loja envia os números na confirmação do pedido)
 };
 export type Promos = { coupons: Coupon[]; rewards: Reward[] };
 export type CouponInput = Omit<Coupon, "id">;
@@ -22,12 +23,24 @@ export type RewardInput = Omit<Reward, "id">;
 
 const KEY = "ponto-certo-promos-v1";
 
+// EXEMPLOS: aparecem enquanto nada foi salvo neste navegador. Edite, desative ou apague pelo painel.
+const EXAMPLE_COUPONS: Coupon[] = [
+  { id: 1, code: "BEMVINDO10", type: "percent", value: 10, minTotal: 50, active: true },
+  { id: 2, code: "DESCONTO15", type: "fixed", value: 15, minTotal: 150, active: true },
+  { id: 3, code: "ATACADO5", type: "percent", value: 5, minTotal: 500, active: true },
+  { id: 4, code: "BLACK20", type: "percent", value: 20, minTotal: 200, active: false },
+];
+const EXAMPLE_REWARDS: Reward[] = [
+  { id: 1, name: "Cupom para o sorteio do carro", everyAmount: 100, repeat: true, active: true, raffle: true },
+  { id: 2, name: "Sacola ecológica de brinde", everyAmount: 150, repeat: false, active: false, raffle: false },
+];
+
 export const normCode = (s: string) => s.trim().toUpperCase().replace(/\s+/g, "");
 
 function read(): Promos {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { coupons: [], rewards: [] };
+    if (!raw) return { coupons: [...EXAMPLE_COUPONS], rewards: [...EXAMPLE_REWARDS] };
     const d = JSON.parse(raw);
     return {
       coupons: Array.isArray(d?.coupons) ? d.coupons : [],

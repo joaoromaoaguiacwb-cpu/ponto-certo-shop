@@ -27,12 +27,19 @@ export const DEFAULT_SETTINGS: Settings = {
   neighborhoods: [],
 };
 
+// EXEMPLO: banner de ofertas ligado até você salvar suas próprias configurações.
+export const EXAMPLE_SETTINGS: Settings = {
+  ...DEFAULT_SETTINGS,
+  bannerEnabled: true,
+  bannerText: "A cada R$ 100 em compras você ganha 1 cupom para concorrer a um carro!",
+};
+
 const KEY = "ponto-certo-settings-v1";
 
 function read(): Settings {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return DEFAULT_SETTINGS;
+    if (!raw) return EXAMPLE_SETTINGS;
     const d = JSON.parse(raw);
     return { ...DEFAULT_SETTINGS, ...d, neighborhoods: Array.isArray(d?.neighborhoods) ? d.neighborhoods : [] };
   } catch {

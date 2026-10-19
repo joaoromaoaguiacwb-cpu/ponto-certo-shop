@@ -5,7 +5,7 @@ import type { Cart } from "@/lib/cart";
 import { rewardLabel } from "@/lib/order";
 
 // Campo de cupom + prêmios ganhos / quanto falta para o próximo prêmio.
-export function PromoBox({ cart }: { cart: Cart }) {
+export function PromoBox({ cart, hideEarned = false }: { cart: Cart; hideEarned?: boolean | undefined }) {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -42,7 +42,7 @@ export function PromoBox({ cart }: { cart: Cart }) {
           </div>
         ))}
 
-      {cart.earned.map((e) => (
+      {!hideEarned && cart.earned.map((e) => (
         <p key={e.reward.id} className="flex items-center gap-1.5 rounded-xl bg-muted px-3 py-2 text-sm font-semibold">
           <Gift size={16} className="shrink-0 text-primary" /> Você ganhou: {rewardLabel(e)}
         </p>

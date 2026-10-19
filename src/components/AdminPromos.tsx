@@ -9,7 +9,8 @@ import { field, Modal, Row, saveError, Section } from "./AdminUi";
 
 const couponSub = (c: Coupon) =>
   `${c.type === "percent" ? `${c.value}% de desconto` : `${brl(c.value)} de desconto`}${c.minTotal > 0 ? ` · compras a partir de ${brl(c.minTotal)}` : " · sem valor mínimo"}`;
-const rewardSub = (r: Reward) => (r.repeat ? `A cada ${brl(r.everyAmount)} em compras (acumula)` : `Compras a partir de ${brl(r.everyAmount)} (1 vez por pedido)`);
+const rewardSub = (r: Reward) =>
+  `${r.raffle ? "Sorteio · " : ""}${r.repeat ? `A cada ${brl(r.everyAmount)} em compras (acumula)` : `Compras a partir de ${brl(r.everyAmount)} (1 vez por pedido)`}`;
 
 /* ------------------------------ CUPONS ------------------------------ */
 
@@ -138,6 +139,7 @@ function RewardForm({ reward, onClose }: { reward: Reward | null; onClose: () =>
   const [every, setEvery] = useState(reward ? String(reward.everyAmount).replace(".", ",") : "");
   const [repeat, setRepeat] = useState(reward?.repeat ?? true);
   const [active, setActive] = useState(reward?.active ?? true);
+  const [raffle, setRaffle] = useState(reward?.raffle ?? false);
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
@@ -147,7 +149,7 @@ function RewardForm({ reward, onClose }: { reward: Reward | null; onClose: () =>
     if (!Number.isFinite(amount) || amount <= 0) return toast.error("Informe o valor em compras");
     setBusy(true);
     try {
-      const data = { name: n, everyAmount: round2(amount), repeat, active };
+      const data = { name: n, everyAmount: round2(amount), repeat, active, raffle };
       if (reward) await editReward(reward.id, data); else await addReward(data);
       toast.success(reward ? "Prêmio atualizado" : "Prêmio criado");
       onClose();
@@ -157,12 +159,16 @@ function RewardForm({ reward, onClose }: { reward: Reward | null; onClose: () =>
   return (
     <Modal title={reward ? "Editar prêmio" : "Novo prêmio"} onClose={onClose}>
       <label className="mt-4 block text-xs font-bold">Prêmio</label>
-      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: 1 refrigerante 600ml de brinde" maxLength={80} className={field} />
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Cupom para o sorteio do carro" maxLength={80} className={field} />
       <label className="mt-3 block text-xs font-bold">A cada quantos reais em compras (R$)</label>
       <input value={every} inputMode="decimal" onChange={(e) => setEvery(e.target.value)} placeholder="100,00" className={field} />
       <label className="mt-4 flex items-start gap-2 text-sm font-semibold">
         <input type="checkbox" checked={repeat} onChange={(e) => setRepeat(e.target.checked)} className="mt-0.5 h-4 w-4" />
         <span>Acumula: ganha de novo a cada valor atingido<span className="block text-xs font-normal text-muted-foreground">Desmarcado, o cliente ganha só 1 vez por pedido ao atingir o valor.</span></span>
+      </label>
+      <label className="mt-3 flex items-start gap-2 text-sm font-semibold">
+        <input type="checkbox" checked={raffle} onChange={(e) => setRaffle(e.target.checked)} className="mt-0.5 h-4 w-4" />
+        <span>É cupom de sorteio<span className="block text-xs font-normal text-muted-foreground">O cliente é avisado de que os números dos cupons são enviados pela loja na confirmação do pedido.</span></span>
       </label>
       <label className="mt-3 flex items-center gap-2 text-sm font-semibold">
         <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="h-4 w-4" /> Prêmio ativo

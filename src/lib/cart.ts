@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { brl } from "@/data/products";
-import { useProducts } from "./productsStore";
+import { useProducts, useProductsReady } from "./productsStore";
 import { usePromos } from "./promosStore";
 import { useSettings } from "./settingsStore";
 import { normCode } from "./promosRepo";
@@ -13,6 +14,7 @@ const KEY = "ponto-certo-cart";
 
 export function useCart() {
   const products = useProducts();
+  const productsReady = useProductsReady();
   const { coupons, rewards } = usePromos();
   const settings = useSettings();
   const [items, setItems] = useState<CartItem[]>([]);
@@ -24,6 +26,15 @@ export function useCart() {
     setReady(true);
   }, []);
   useEffect(() => { if (ready) localStorage.setItem(KEY, JSON.stringify(items)); }, [items, ready]);
+
+  // Produto que a loja apagou some do carrinho, com aviso.
+  useEffect(() => {
+    if (!ready || !productsReady) return;
+    const gone = items.filter((i) => !products.some((p) => p.id === i.id));
+    if (gone.length === 0) return;
+    setItems((c) => c.filter((i) => products.some((p) => p.id === i.id)));
+    toast.info(gone.length === 1 ? "Um produto do seu carrinho não está mais disponível e foi removido." : `${gone.length} produtos do seu carrinho não estão mais disponíveis e foram removidos.`);
+  }, [ready, productsReady, items, products]);
 
   const add = (id: number, qty: number, note?: string) => {
     const n = note?.trim() || undefined;

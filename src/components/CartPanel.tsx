@@ -1,7 +1,7 @@
 import { Minus, Plus, Trash2, X } from "lucide-react";
 import { brl } from "@/data/products";
 import type { Cart } from "@/lib/cart";
-import { fmtQty, stepOf } from "@/lib/pricing";
+import { fmtQty, stepOf, unitOf } from "@/lib/pricing";
 import { ProductImage } from "./ProductImage";
 import { PromoBox } from "./PromoBox";
 
@@ -39,7 +39,7 @@ export function CartPanel({ cart, onClose, onCheckout }: { cart: Cart; onClose: 
                         <p className="text-xs font-bold text-accent">Esgotado — remova para continuar</p>
                       ) : (
                         <p className="text-xs text-muted-foreground">
-                          {brl(l.unitPrice)} cada{l.unitPrice < l.product.price ? " (preço de atacado)" : ""}
+                          {brl(l.unitPrice)} {unitOf(l.product) === "kg" ? "por kg" : "cada"}{l.unitPrice < l.product.price ? " (preço de atacado)" : ""}
                         </p>
                       )}
                       <input value={l.note ?? ""} onChange={(e) => cart.setNote(l.id, e.target.value)} maxLength={80} placeholder="Observação"

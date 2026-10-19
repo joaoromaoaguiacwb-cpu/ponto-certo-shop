@@ -18,7 +18,17 @@ export type ProductInput = {
 };
 export type PriceSnapshot = Record<number, { price: number; wholesale: Product["wholesale"] }>;
 
-const seed = (): Product[] => SEED.map((p) => ({ ...p, onSale: !!p.onSale }));
+// EXEMPLOS: produtos em promoção e preços de atacado (editáveis pelo painel; "Restaurar originais" volta a isto).
+const EXAMPLE_SALE = new Set([1, 37, 38, 91, 111, 114, 116, 147, 165, 183]);
+const EXAMPLE_WHOLESALE: Record<number, { minQty: number; price: number }> = {
+  37: { minQty: 5, price: 15.9 }, // Peito de Frango kg: a partir de 5 kg
+  92: { minQty: 10, price: 7.2 }, // Feijão Carioca 1kg: a partir de 10 un
+  111: { minQty: 6, price: 8.9 }, // Refrigerante Cola 2L: a partir de 6 un
+  113: { minQty: 12, price: 2.19 }, // Água Mineral 1,5L: a partir de 12 un
+};
+
+const seed = (): Product[] =>
+  SEED.map((p) => ({ ...p, onSale: EXAMPLE_SALE.has(p.id), wholesale: EXAMPLE_WHOLESALE[p.id] ?? null }));
 
 function read(): Product[] | null {
   try {

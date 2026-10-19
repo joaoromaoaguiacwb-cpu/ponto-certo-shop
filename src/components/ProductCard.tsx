@@ -2,12 +2,14 @@ import { useState } from "react";
 import { Minus, Plus, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { brl, type Product } from "@/data/products";
-import { fmtQty, hasWholesale, labelQty, stepOf, unitPriceFor } from "@/lib/pricing";
+import { fmtQty, hasWholesale, labelQty, stepOf, unitOf, unitPriceFor } from "@/lib/pricing";
 import { ProductImage } from "./ProductImage";
 
 export function ProductCard({ product, onAdd }: { product: Product; onAdd: (id: number, q: number, note?: string) => void }) {
   const step = stepOf(product);
-  const [qty, setQty] = useState(step);
+  const kg = unitOf(product) === "kg";
+  const start = kg ? 1 : step; // peso começa em 1 kg (dá para baixar até 0,5 kg)
+  const [qty, setQty] = useState(start);
   const [note, setNote] = useState("");
   const [showNote, setShowNote] = useState(false);
   const soldOut = !!product.soldOut;
@@ -35,7 +37,7 @@ export function ProductCard({ product, onAdd }: { product: Product; onAdd: (id: 
         <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-tight text-foreground">{product.name}</h3>
         <div>
           <p className="text-lg font-extrabold text-primary">
-            {brl(price)}
+            {brl(price)}{kg && <span className="text-xs font-semibold text-muted-foreground">/kg</span>}
             {atWholesale && <span className="ml-1.5 text-xs font-semibold text-muted-foreground line-through">{brl(product.price)}</span>}
           </p>
           {w && (
@@ -62,7 +64,7 @@ export function ProductCard({ product, onAdd }: { product: Product; onAdd: (id: 
           onClick={() => {
             onAdd(product.id, qty, note);
             toast.success(`${labelQty(product, qty)} de ${product.name} adicionado!`);
-            setQty(step);
+            setQty(start);
             setNote("");
             setShowNote(false);
           }}

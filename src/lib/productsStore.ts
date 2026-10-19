@@ -8,6 +8,7 @@ export type { ProductInput } from "./productsRepo";
 // e troca pela lista salva assim que o site abre no navegador.
 let state: Product[] = SEED;
 let loaded = false;
+let ready = false;
 const subs = new Set<() => void>();
 
 const set = (list: Product[]) => {
@@ -24,7 +25,9 @@ const subscribe = (f: () => void) => {
 export async function loadProducts() {
   if (loaded) return;
   loaded = true;
-  set(await repo.listProducts());
+  const list = await repo.listProducts();
+  ready = true;
+  set(list);
 }
 
 export async function addProduct(input: repo.ProductInput) {
@@ -56,6 +59,10 @@ export async function restorePrices(before: repo.PriceSnapshot) {
 export async function restoreProducts() {
   await repo.resetProducts();
   set(await repo.listProducts());
+}
+
+export function useProductsReady(): boolean {
+  return useSyncExternalStore(subscribe, () => ready, () => false);
 }
 
 export function useProducts(): Product[] {

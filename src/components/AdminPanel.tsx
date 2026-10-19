@@ -9,6 +9,7 @@ import { ProductImage } from "./ProductImage";
 import { Confirm } from "./Confirm";
 import { CouponsAdmin, RewardsAdmin } from "./AdminPromos";
 import { StoreAdmin } from "./AdminStore";
+import { AdminDashboard } from "./AdminDashboard";
 import { Modal } from "./AdminUi";
 import { hasWholesale, unitOf } from "@/lib/pricing";
 import { parseMoney } from "@/lib/money";
@@ -31,7 +32,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   const [editing, setEditing] = useState<Product | "new" | null>(null);
   const [deleting, setDeleting] = useState<Product | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [tab, setTab] = useState<"produtos" | "cupons" | "premios" | "loja">("produtos");
+  const [tab, setTab] = useState<"vendas" | "produtos" | "cupons" | "premios" | "loja">("vendas");
   const [bulk, setBulk] = useState(false);
 
   const list = useMemo(
@@ -75,14 +76,14 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
       <nav className="border-b bg-card">
         <div className="mx-auto flex max-w-5xl gap-2 overflow-x-auto px-4 py-2">
-          {([["produtos", "Produtos"], ["cupons", "Cupons"], ["premios", "Prêmios"], ["loja", "Loja"]] as const).map(([id, label]) => (
+          {([["vendas", "Vendas"], ["produtos", "Produtos"], ["cupons", "Cupons"], ["premios", "Prêmios"], ["loja", "Loja"]] as const).map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} aria-pressed={tab === id}
               className={`rounded-full px-4 py-2 text-sm font-bold ${tab === id ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"}`}>{label}</button>
           ))}
         </div>
       </nav>
 
-      {tab === "produtos" ? (
+      {tab === "vendas" ? <AdminDashboard /> : tab === "produtos" ? (
       <div className="mx-auto w-full max-w-5xl flex-1 overflow-y-auto px-4 pb-10">
         <div className="sticky top-0 z-10 -mx-4 bg-background/95 px-4 pb-3 pt-4 backdrop-blur">
           <div className="flex flex-col gap-2 sm:flex-row">

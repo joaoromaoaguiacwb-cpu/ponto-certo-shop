@@ -7,18 +7,37 @@ import { rewardLabel } from "@/lib/order";
 import { fmtQty, unitOf } from "@/lib/pricing";
 import { round2 } from "@/lib/money";
 import { useSettings } from "@/lib/settingsStore";
+import { addOrder } from "@/lib/ordersStore";
+import { PromoBox } from "./PromoBox";
 
 const PAYMENTS = ["Pix", "Cartão de crédito", "Cartão de débito", "Dinheiro"];
 type Form = { nome: string; telefone: string; rua: string; numero: string; bairro: string; cidade: string; complemento: string; pagamento: string; troco: string };
 const empty: Form = { nome: "", telefone: "", rua: "", numero: "", bairro: "", cidade: "", complemento: "", pagamento: "", troco: "" };
 
+// Dados do cliente ficam salvos neste aparelho (localStorage) para os próximos pedidos.
+const SAVED_KEY = "ponto-certo-customer";
+type Saved = Partial<Omit<Form, "troco">> & { modo?: "entrega" | "retirada"; outroBairro?: boolean };
+function loadSaved(): Saved | null {
+  try {
+    const raw = localStorage.getItem(SAVED_KEY);
+    return raw ? (JSON.parse(raw) as Saved) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => void; onDone: () => void }) {
   const settings = useSettings();
-  const [f, setF] = useState<Form>(empty);
+  const [saved, setSaved] = useState<Saved | null>(loadSaved);
+  const [f, setF] = useState<Form>(() => ({
+    ...empty,
+    nome: saved?.nome ?? "", telefone: saved?.telefone ?? "", rua: saved?.rua ?? "", numero: saved?.numero ?? "",
+    bairro: saved?.bairro ?? "", cidade: saved?.cidade ?? "", complemento: saved?.complemento ?? "", pagamento: saved?.pagamento ?? "",
+  }));
   const [errors, setErrors] = useState<Partial<Record<keyof Form, string>>>({});
   const [locating, setLocating] = useState(false);
-  const [modo, setModo] = useState<"entrega" | "retirada">("entrega");
-  const [outroBairro, setOutroBairro] = useState(false);
+  const [modo, setModo] = useState<"entrega" | "retirada">(saved?.modo ?? "entrega");
+  const [outroBairro, setOutroBairro] = useState(!!saved?.outroBairro);
   const set = (k: keyof Form) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
 
   const hoods = settings.neighborhoods.filter((n) => n.active);
@@ -31,6 +50,15 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
   const grand = round2(cart.total + (fee ?? 0));
   const feePending = useHoodList && fee === null;
   const closed = !settings.open;
+  const hasRaffle = cart.earned.some((e) => e.reward.raffle);
+
+  const clearSaved = () => {
+    try { localStorage.removeItem(SAVED_KEY); } catch { /* nada */ }
+    setSaved(null);
+    setF(empty);
+    setOutroBairro(false);
+    toast.success("Dados apagados deste aparelho");
+  };
 
   const locate = () => {
     if (!navigator.geolocation) { toast.error("Seu aparelho não suporta localização."); return; }
@@ -57,7 +85,7 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
     if (delivery) {
       if (!f.rua.trim()) e.rua = "Obrigatório";
       if (!f.numero.trim()) e.numero = "Obrigatório";
-      if (!f.bairro.trim()) e.bairro = "Obrigatório";
+      if (!f.bairro.trim() || (useHoodList && !outroBairro && !hood)) e.bairro = "Escolha o bairro";
       if (!f.cidade.trim()) e.cidade = "Obrigatório";
     }
     if (!f.pagamento) e.pagamento = "Escolha a forma de pagamento";
@@ -73,12 +101,24 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
     const local = retirada ? `🏬 Retirada na loja${settings.pickupAddress ? ` (${settings.pickupAddress})` : ""}` : `📍 Endereço: ${endereco}`;
     const extras = [
       cart.coupon ? `\n🎟️ Cupom ${cart.coupon.code}: -${brl(cart.discount)} (subtotal ${brl(cart.subtotal)})` : "",
-      cart.earned.length ? `\n🎁 *Prêmios:* ${cart.earned.map(rewardLabel).join(", ")}` : "",
+      cart.earned.length ? `\n🎁 *Você ganhou:* ${cart.earned.map(rewardLabel).join(", ")}` : "",
+      hasRaffle ? "\n🍀 Os números dos cupons do sorteio serão enviados na confirmação do pedido." : "",
       useHoodList ? (fee !== null ? `\n🚚 Taxa de entrega (${f.bairro.trim()}): ${brl(fee)}` : "\n🚚 Taxa de entrega: a combinar") : "",
       cart.lines.some((l) => unitOf(l.product) === "kg") ? "\n⚖️ Itens por kg: o valor final pode variar conforme a pesagem." : "",
     ].join("");
     const totalTxt = `${brl(grand)}${feePending ? " + taxa de entrega" : ""}`;
-    const msg = `🛒 *NOVO PEDIDO - PONTO CERTO*\n\n👤 Cliente: ${f.nome.trim()}\n📞 Telefone: ${f.telefone.trim()}\n${local}\n💳 Pagamento: ${pagamento}\n\n*Produtos:*\n${produtos}${extras}\n\n💰 *TOTAL: ${totalTxt}*\n\nObrigado por comprar no Ponto Certo! Seu pedido será confirmado em instantes. ✅`;
+    const msg = `🛒 *NOVO PEDIDO - PONTO CERTO*\n\n👤 Cliente: ${f.nome.trim()}\n📞 Telefone: ${f.telefone.trim()}\n${local}\n💳 Pagamento (na hora da ${retirada ? "retirada" : "entrega"}): ${pagamento}\n\n*Produtos:*\n${produtos}${extras}\n\n💰 *TOTAL: ${totalTxt}*\n\nObrigado por comprar no Ponto Certo! Seu pedido será confirmado em instantes. ✅`;
+    // guarda os dados do cliente neste aparelho para os próximos pedidos
+    try {
+      const keep: Saved = {
+        nome: f.nome.trim(), telefone: f.telefone.trim(), rua: f.rua.trim(), numero: f.numero.trim(), bairro: f.bairro.trim(),
+        cidade: f.cidade.trim(), complemento: f.complemento.trim(), pagamento: f.pagamento, modo, outroBairro,
+      };
+      localStorage.setItem(SAVED_KEY, JSON.stringify(keep));
+    } catch { /* sem espaço: segue sem salvar */ }
+    // registra o pedido para o painel de vendas (falha aqui não impede o envio)
+    const sum = (u: "kg" | "un") => cart.lines.filter((l) => unitOf(l.product) === u).reduce((s, l) => s + l.qty, 0);
+    void addOrder({ total: grand, units: sum("un"), kg: sum("kg"), coupon: cart.coupon?.code ?? null }).catch(() => {});
     window.open(`https://wa.me/${STORE_WHATSAPP}?text=${encodeURIComponent(msg)}`, "_blank");
     cart.clear();
     onDone();
@@ -112,6 +152,10 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
           <h3 className="font-extrabold text-primary">Seus dados</h3>
           {input("nome", "Nome completo *", { autoComplete: "name", maxLength: 100 })}
           {input("telefone", "Telefone/WhatsApp *", { type: "tel", inputMode: "tel", placeholder: "(27) 99999-9999", maxLength: 20 })}
+          <p className="text-xs text-muted-foreground">
+            Seus dados ficam salvos neste aparelho para os próximos pedidos.{" "}
+            {saved && <button onClick={clearSaved} className="font-semibold underline">Apagar dados salvos</button>}
+          </p>
         </section>
 
         {settings.pickupEnabled && (
@@ -135,7 +179,7 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
                 {input("numero", "Número *", { maxLength: 10 })}
                 <label className="block">
                   <span className="mb-1 block text-sm font-semibold">Bairro *</span>
-                  <select value={outroBairro ? "__outro" : f.bairro}
+                  <select value={outroBairro ? "__outro" : hood ? f.bairro : ""}
                     onChange={(e) => {
                       if (e.target.value === "__outro") { setOutroBairro(true); setF({ ...f, bairro: "" }); }
                       else { setOutroBairro(false); setF({ ...f, bairro: e.target.value }); }
@@ -162,6 +206,9 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
 
         <section className="space-y-3">
           <h3 className="font-extrabold text-primary">Forma de pagamento *</h3>
+          <p className="rounded-xl bg-muted px-3 py-2 text-sm font-semibold">
+            {retirada ? "🏬 Você paga na hora da retirada, na loja." : "🚚 Você paga na hora que o pedido chegar."}
+          </p>
           <div className="grid grid-cols-2 gap-2">
             {PAYMENTS.map((p) => (
               <button key={p} onClick={() => setF({ ...f, pagamento: p })}
@@ -187,6 +234,7 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
               </li>
             ))}
           </ul>
+          <div className="mt-3 border-t pt-3"><PromoBox cart={cart} hideEarned /></div>
           {(cart.discount > 0 || useHoodList) && (
             <div className="mt-3 space-y-0.5 border-t pt-3 text-sm text-muted-foreground">
               {cart.discount > 0 && (
@@ -201,7 +249,10 @@ export function Checkout({ cart, onBack, onDone }: { cart: Cart; onBack: () => v
             </div>
           )}
           {cart.earned.length > 0 && (
-            <p className="mt-3 rounded-xl bg-muted px-3 py-2 text-sm font-semibold">🎁 Você ganhou: {cart.earned.map(rewardLabel).join(", ")}</p>
+            <div className="mt-3 rounded-xl bg-muted px-3 py-2 text-sm font-semibold">
+              🎁 Você ganhou: {cart.earned.map(rewardLabel).join(", ")}
+              {hasRaffle && <p className="mt-1 text-xs font-normal text-muted-foreground">Os números dos cupons do sorteio são enviados na confirmação do pedido.</p>}
+            </div>
           )}
           <div className="mt-3 flex justify-between border-t pt-3 text-lg font-extrabold"><span>Total</span><span className="text-primary">{brl(grand)}{feePending && outroBairro ? " + taxa" : ""}</span></div>
           {cart.lines.some((l) => unitOf(l.product) === "kg") && <p className="mt-2 text-xs text-muted-foreground">⚖️ Itens por kg: o valor final pode variar conforme a pesagem.</p>}
